@@ -27,10 +27,12 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
 | `data/junctions.json` | Cấu hình mẫu hợp lệ: schema_version 2, configurations rỗng |
 | `tests/` | Smoke tests cấu trúc, imports, JSON, metadata uv; test thuật toán còn TODO |
-| `src/smarttrafficlight/` | Package do uv khởi tạo trước đó, giữ nguyên để tương thích build hiện tại |
 
 Models biểu diễn dữ liệu; Core Logic xử lý nghiệp vụ; UI hiển thị và tiếp nhận thao tác.
 Không đặt thuật toán hoặc xử lý nghiệp vụ trong `app.py`.
+
+Dự án là ứng dụng Streamlit chạy trực tiếp từ `src/app.py`; uv quản lý môi trường
+và dependencies, không đóng gói ứng dụng thành thư viện Python.
 
 ## Cấu trúc dữ liệu dự kiến
 

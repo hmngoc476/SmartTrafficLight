@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img"><title>Wireframe Tab 1 Quản lý cấu hình</title>
+<rect x="0" y="0" width="1920" height="1080" rx="8" fill="#f2f4f6" stroke="none" />
+<rect x="0" y="0" width="1920" height="88" rx="0" fill="white" stroke="none" />
+<text x="40" y="45" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#263238" text-anchor="start">Smart Traffic Light Simulator</text>
+<text x="40" y="72" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="400" fill="#66727b" text-anchor="start">Task 5 · Wireframe desktop · Chưa phải giao diện đã triển khai</text>
+<rect x="1440" y="23" width="440" height="40" rx="8" fill="#f7f8fa" stroke="#c7cfd5" />
+<text x="1660" y="49" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#263238" text-anchor="middle">THIẾT KẾ / DỮ LIỆU MINH HỌA</text>
+<rect x="40" y="106" width="286" height="42" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="56" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#263238" text-anchor="start">Quản lý cấu hình</text>
+<line x1="48" y1="148" x2="318" y2="148" stroke="#263238" stroke-width="3" />
+<rect x="340" y="106" width="286" height="42" rx="8" fill="#f2f4f6" stroke="#c7cfd5" />
+<text x="356" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">Mô phỏng và phân tích</text>
+<rect x="40" y="170" width="1840" height="176" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="58" y="199" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Danh sách cấu hình · Xem, chọn và quản lý các giao lộ</text>
+<line x1="58" y1="212" x2="1862" y2="212" stroke="#c7cfd5" stroke-width="1" />
+<rect x="58" y="221" width="1804" height="44" rx="0" fill="#f7f8fa" stroke="#c7cfd5" />
+<rect x="58" y="267" width="1804" height="42" rx="0" fill="#e5edf3" stroke="#c7cfd5" />
+<text x="66" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Configuration ID</text>
+<text x="66" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">JCT-001</text>
+<text x="256" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Tên cấu hình</text>
+<text x="256" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">Giao lộ mẫu - lệch hướng Đông Tây</text>
+<text x="706" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Lưu lượng N</text>
+<text x="706" y="260" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#66727b" text-anchor="start">xe/phút</text>
+<text x="706" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">12</text>
+<text x="846" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Lưu lượng S</text>
+<text x="846" y="260" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#66727b" text-anchor="start">xe/phút</text>
+<text x="846" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">9</text>
+<text x="986" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Lưu lượng E</text>
+<text x="986" y="260" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#66727b" text-anchor="start">xe/phút</text>
+<text x="986" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">18</text>
+<text x="1126" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Lưu lượng W</text>
+<text x="1126" y="260" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400" fill="#66727b" text-anchor="start">xe/phút</text>
+<text x="1126" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">7</text>
+<text x="1266" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Ngân sách xanh</text>
+<text x="1266" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">60 giây</text>
+<text x="1456" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Số chu kỳ</text>
+<text x="1456" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">10</text>
+<text x="1586" y="243" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#263238" text-anchor="start">Trạng thái lựa chọn</text>
+<text x="1586" y="294" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">Đang chọn</text>
+<text x="58" y="333" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Chọn theo ID: JCT-001  ▾   ·   st.selectbox + bảng chỉ đọc   ·   ID không sửa trực tiếp trong bảng</text>
+<rect x="40" y="361" width="1840" height="44" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="58" y="389" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#263238" text-anchor="start">Đang chọn: JCT-001  |  Giao lộ mẫu - lệch hướng Đông Tây  |  Chế độ: chỉnh sửa bản mẫu</text>
+<rect x="40" y="428" width="520" height="184" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="58" y="457" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Thông tin chung</text>
+<line x1="58" y1="470" x2="542" y2="470" stroke="#c7cfd5" stroke-width="1" />
+<text x="58" y="491" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Tên cấu hình</text>
+<rect x="58" y="501" width="484" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="70" y="526" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">Giao lộ mẫu - lệch hướng Đông Tây</text>
+<text x="58" y="558" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Configuration ID · hệ thống quản lý / chỉ đọc</text>
+<rect x="58" y="568" width="484" height="36" rx="5" fill="#f7f8fa" stroke="#c7cfd5" />
+<text x="70" y="593" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">JCT-001</text>
+<rect x="40" y="627" width="520" height="136" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="58" y="656" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Lưu lượng bốn hướng</text>
+<line x1="58" y1="669" x2="542" y2="669" stroke="#c7cfd5" stroke-width="1" />
+<text x="58" y="688" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">N · xe/phút</text>
+<rect x="58" y="698" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="70" y="723" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">12</text>
+<text x="182" y="688" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">S · xe/phút</text>
+<rect x="182" y="698" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="194" y="723" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">9</text>
+<text x="306" y="688" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">E · xe/phút</text>
+<rect x="306" y="698" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="318" y="723" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">18</text>
+<text x="430" y="688" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">W · xe/phút</text>
+<rect x="430" y="698" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="442" y="723" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">7</text>
+<rect x="40" y="779" width="520" height="136" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="58" y="808" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Hàng chờ ban đầu · Initial Queue</text>
+<line x1="58" y1="821" x2="542" y2="821" stroke="#c7cfd5" stroke-width="1" />
+<text x="58" y="840" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Initial N · xe</text>
+<rect x="58" y="850" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="70" y="875" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">7</text>
+<text x="182" y="840" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Initial S · xe</text>
+<rect x="182" y="850" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="194" y="875" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">4</text>
+<text x="306" y="840" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Initial E · xe</text>
+<rect x="306" y="850" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="318" y="875" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">16</text>
+<text x="430" y="840" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Initial W · xe</text>
+<rect x="430" y="850" width="112" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="442" y="875" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">5</text>
+<text x="58" y="935" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">N/S/E/W bắt buộc · ID giữ nguyên khi cập nhật</text>
+<rect x="580" y="428" width="624" height="283" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="598" y="457" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Thông số tín hiệu</text>
+<line x1="598" y1="470" x2="1186" y2="470" stroke="#c7cfd5" stroke-width="1" />
+<text x="598" y="491" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Green Budget · giây</text>
+<rect x="598" y="501" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="610" y="526" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">60</text>
+<text x="900" y="491" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Min Green · giây</text>
+<rect x="900" y="501" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="912" y="526" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">10</text>
+<text x="598" y="565" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Yellow · giây</text>
+<rect x="598" y="575" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="610" y="600" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">3</text>
+<text x="900" y="565" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">All Red · giây</text>
+<rect x="900" y="575" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="912" y="600" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">1</text>
+<text x="598" y="639" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Startup Delay · giây</text>
+<rect x="598" y="649" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="610" y="674" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">2</text>
+<text x="900" y="639" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Headway · giây</text>
+<rect x="900" y="649" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="912" y="674" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">2</text>
+<text x="598" y="703" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400" fill="#66727b" text-anchor="start">Ràng buộc: Green Budget ≥ 2 × Min Green</text>
+<rect x="580" y="726" width="624" height="129" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="598" y="755" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Thông số mô phỏng</text>
+<line x1="598" y1="768" x2="1186" y2="768" stroke="#c7cfd5" stroke-width="1" />
+<text x="598" y="789" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Số chu kỳ · 1–100</text>
+<rect x="598" y="799" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="610" y="824" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">10</text>
+<text x="900" y="789" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Random seed · số nguyên</text>
+<rect x="900" y="799" width="286" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="912" y="824" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">2026</text>
+<rect x="580" y="870" width="624" height="66" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="598" y="897" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Vị trí lỗi validation · trạng thái minh họa</text>
+<text x="598" y="924" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400" fill="#66727b" text-anchor="start">Thiếu tên / ID trùng · Sai lưu lượng / thiếu hướng · Sai xanh / motion</text>
+<rect x="1224" y="428" width="656" height="508" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="1242" y="457" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#263238" text-anchor="start">Thông số chuyển động 2D</text>
+<line x1="1242" y1="470" x2="1862" y2="470" stroke="#c7cfd5" stroke-width="1" />
+<rect x="1242" y="484" width="54" height="25" rx="12" fill="#263238" stroke="#c7cfd5" />
+<circle cx="1283" cy="496.5" r="9" fill="white"/>
+<text x="1310" y="503" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="400" fill="#263238" text-anchor="start">Bật motion 2D · enabled = true</text>
+<text x="1242" y="544" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">dt · giây / substep</text>
+<rect x="1242" y="554" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1254" y="579" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">0.2</text>
+<text x="1560" y="544" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Vehicle Length · mét</text>
+<rect x="1560" y="554" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1572" y="579" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">4.5</text>
+<text x="1242" y="618" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Min Gap · mét</text>
+<rect x="1242" y="628" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1254" y="653" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">2.0</text>
+<text x="1560" y="618" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Max Speed · m/s</text>
+<rect x="1560" y="628" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1572" y="653" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">9.0</text>
+<text x="1242" y="692" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Acceleration · m/s²</text>
+<rect x="1242" y="702" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1254" y="727" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">2.0</text>
+<text x="1560" y="692" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Approach Visible · mét</text>
+<rect x="1560" y="702" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1572" y="727" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">60.0</text>
+<text x="1242" y="766" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Intersection Width · mét</text>
+<rect x="1242" y="776" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1254" y="801" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">16.0</text>
+<text x="1560" y="766" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Stop Margin · mét</text>
+<rect x="1560" y="776" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1572" y="801" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">0.5</text>
+<text x="1242" y="840" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Clearance Limit · giây</text>
+<rect x="1242" y="850" width="302" height="36" rx="5" fill="white" stroke="#c7cfd5" />
+<text x="1254" y="875" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" fill="#263238" text-anchor="start">30</text>
+<text x="1560" y="894" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">dt = 0.2 → 5 substep/tick</text>
+<text x="1560" y="917" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Thông số mô phỏng học thuật</text>
+<rect x="40" y="955" width="144" height="40" rx="8" fill="#e5edf3" stroke="#c7cfd5" />
+<text x="112.0" y="981" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#263238" text-anchor="middle">Tạo mới</text>
+<rect x="196" y="955" width="184" height="40" rx="8" fill="#eceff1" stroke="#c7cfd5" />
+<text x="288.0" y="981" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#66727b" text-anchor="middle">Lưu cấu hình</text>
+<rect x="392" y="955" width="156" height="40" rx="8" fill="#e5edf3" stroke="#c7cfd5" />
+<text x="470.0" y="981" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#263238" text-anchor="middle">Cập nhật</text>
+<rect x="560" y="955" width="224" height="40" rx="8" fill="#fff" stroke="#c7cfd5" />
+<text x="672.0" y="981" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#263238" text-anchor="middle">Xóa · cần xác nhận</text>
+<rect x="796" y="955" width="238" height="40" rx="8" fill="#e5edf3" stroke="#c7cfd5" />
+<text x="915.0" y="981" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#263238" text-anchor="middle">Dùng cấu hình này</text>
+<rect x="1046" y="955" width="228" height="40" rx="8" fill="#e5edf3" stroke="#c7cfd5" />
+<text x="1160.0" y="981" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#263238" text-anchor="middle">Làm mới biểu mẫu</text>
+<rect x="1306" y="953" width="574" height="69" rx="8" fill="white" stroke="#c7cfd5" />
+<text x="1322" y="977" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#263238" text-anchor="start">Xác nhận xóa JCT-001?  [Hủy]  [Xác nhận xóa]</text>
+<text x="1322" y="1004" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400" fill="#66727b" text-anchor="start">Khung minh họa bước xác nhận, chưa thực hiện xóa.</text>
+<text x="40" y="1030" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="400" fill="#66727b" text-anchor="start">Enabled: thao tác hợp lệ   ·   Disabled: sai chế độ / dữ liệu lỗi   ·   Lỗi hiển thị dưới trường và trong banner</text>
+<text x="40" y="1061" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="400" fill="#66727b" text-anchor="start">Nguồn mẫu: docs/examples/junctions_v2.example.json · ID do ConfigManager cấp · UI không ghi file trực tiếp</text>
+</svg>

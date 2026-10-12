@@ -34,7 +34,7 @@ def test_packages_import():
 
 def test_sample_json():
     data = json.loads((ROOT / "data/junctions.json").read_text(encoding="utf-8"))
-    assert data == {"schema_version": 2, "configurations": []}
+    assert data == {"schema_version": 2, "configs": []}
 
 
 def test_uv_metadata():

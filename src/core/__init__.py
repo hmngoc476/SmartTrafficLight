@@ -1,0 +1,1 @@
+"""Core logic scaffold; business functions are pending."""

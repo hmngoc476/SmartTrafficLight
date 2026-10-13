@@ -114,3 +114,46 @@ uv run streamlit run src/app.py
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không
 coi các chức năng dự kiến là đã hoạt động.
+
+## Models triển khai ngày 13/10/2026
+
+Import API: `from src.models import Config, Motion2DConfig, Vehicle, Lane`.
+Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI.
+
+- `Config()` tự validate; `validate()` kiểm tra lại sau khi chỉnh cấu hình.
+  `arrival_rates` là dictionary N/S/E/W (đề xuất xe/phút, cần xác nhận với Poisson),
+  `initial_queue` là dictionary số xe nguyên mỗi hướng. `motion2d` chứa tham số 2D.
+  `to_dict()` trả bản sao độc lập; `Config.from_dict(data)` nhận đủ các trường
+  của một cấu hình, từ chối trường thiếu/thừa. Không nhận envelope Storage.
+- Default đề xuất: id="default", name="Ngã tư mặc định", lưu lượng 10/hướng,
+  queue 0/hướng, green_budget_s=60, min_green_s=10, yellow_s=3, all_red_s=1,
+  startup_delay_s=2, headway_s=2, cycles_to_run=10, seed=42.
+  Motion2D: dt_s=0.2, vehicle_length_m=4.5, min_gap_m=2, max_speed_mps=13.9,
+  accel_mps2=2, approach_visible_m=100, intersection_width_m=20,
+  stop_margin_m=0.5, clearance_limit_s=30. Bảng default V2.3 không có trong
+  yêu cầu gửi kèm/repository; cần đối chiếu trước khi tích hợp.
+- `Vehicle` có trường chỉ đọc; dùng `update_motion(s_front_m, speed_mps)`
+  để cập nhật tiến, không tự ghi nhận crossing. Xe mới ở s_front_m <= 0.
+  Controller kiểm tra tín hiệu, vị trí và xe đầu Lane, rồi gọi `mark_crossed(t)`
+  một lần khi đầu xe tới/vượt vạch, ngay sau đó `Lane.pop_crossed()` và chuyển
+  xe sang active_crossing. `mark_exited(t)` dùng sau crossing khi Core xác nhận
+  xe rời khung. Các thời điểm sự kiện cùng hệ thời gian mô phỏng, đơn vị giây.
+  `elapsed_to_stopline()` trả None trước crossing; `add_stopped_delay(dt_s)`
+  cộng thời gian đứng yên trước crossing; `snapshot()` phục vụ UI/thống kê.
+  `to_xy(geometry)` cần `geometry.lane_to_xy(origin, s_front_m) -> (x, y)`.
+- `Lane(direction)` dùng deque; `enqueue(vehicle)` yêu cầu thứ tự arrival_t
+  không giảm (cùng thời điểm theo thứ tự enqueue). ID không được tái sử dụng
+  trong cùng Lane kể cả sau khi pop. Core cấp ID duy nhất toàn mô phỏng.
+  `peek()` xem đầu, `pop_crossed()` lấy đầu đã crossing; cả hai trả None khi rỗng.
+  Pop khi đầu chưa crossing raise ValueError và giữ nguyên Queue.
+  `get_vehicles()` trả tuple, `count()` đếm mọi xe còn trong Queue.
+- Controller gọi `reset_green_clock(started_at, startup_delay_s, headway_s)`
+  khi bắt đầu xanh: thời điểm đủ điều kiện đầu tiên là start + startup delay.
+  Sau pop, đồng hồ kế tiếp là max(đồng hồ cũ, crossed_stop_t + headway).
+  `is_cross_eligible(t)` chỉ kiểm tra đồng hồ và Queue, không cấp quyền qua đèn.
+  `reset_green_clock()` xóa clock khi kết thúc xanh; không xóa xe.
+
+Storage cần thống nhất tên trường, đơn vị lưu lượng và default ở trên.
+JSON hiện dùng `{"schema_version": 2, "configurations": []}`; tài liệu V2.3
+được đề cập trong yêu cầu dùng `configs`. Chưa đổi JSON hoặc smoke test;
+Storage phải thống nhất envelope riêng với nhóm trước khi nối Config.

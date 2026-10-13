@@ -5,6 +5,7 @@ docs/algorithm_contracts.md. Không có thuật toán hoạt động trong modul
 """
 
 from typing import Protocol
+import math
 
 
 class RandomSource(Protocol):
@@ -38,7 +39,38 @@ def poisson_sample(lam: float, rng: RandomSource) -> int:
     Thứ tự gọi N -> S -> E -> W do SimulationEngine chịu trách nhiệm.
     Hàm không tạo Vehicle, sửa Queue, đọc cấu hình hoặc truy cập UI.
     """
-    raise NotImplementedError("Poisson chưa được triển khai; dự kiến ngày 15/10/2026.")
+    #raise NotImplementedError("Poisson chưa được triển khai; dự kiến ngày 15/10/2026.")
+    # 1. Kiểm tra kiểu lam; bool phải bị từ chối dù bool là subclass của int.
+    if isinstance(lam, bool) or not isinstance(lam, (int, float)):
+        raise TypeError("lam phải là int hoặc float, không phải bool.")
+
+    # 2. Kiểm tra tính hữu hạn và không âm.
+    # Mọi int Python đều hữu hạn; chỉ cần isfinite cho float.
+    if isinstance(lam, float) and not math.isfinite(lam):
+        raise ValueError("lam phải là số hữu hạn.")
+
+    if lam < 0:
+        raise ValueError("lam phải >= 0.")
+
+    # 3. Kiểm tra RNG sau khi lam đã hợp lệ.
+    random_method = getattr(rng, "random", None)
+    if not callable(random_method):
+        raise TypeError("rng phải có phương thức random() callable.")
+
+    # 4. Trường hợp đặc biệt: không tiêu thụ RNG.
+    if lam == 0:
+        return 0
+
+    # 5. Thuật toán Knuth.
+    threshold = math.exp(-lam)
+    product = 1.0
+    count = 0
+
+    while product > threshold:
+        count += 1
+        product *= random_method()
+
+    return count - 1
 
 
 def allocate_green_adaptive(

@@ -26,7 +26,7 @@ def test_p05_rate_conversion():
     assert lam == pytest.approx(0.3)
 
 
-@pytest.mark.skip(reason="Poisson chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
+#@pytest.mark.skip(reason="Poisson chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
 class TestPoissonContract:
     def test_p01_zero_lambda(self):
         rng = random.Random(2026)

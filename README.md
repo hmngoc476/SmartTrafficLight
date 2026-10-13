@@ -25,7 +25,7 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 | `src/core/` | Khung thuật toán, điều phối, hình học, chuyển động, mô phỏng, thống kê, quản lý và lưu trữ |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
-| `data/junctions.json` | Cấu hình mẫu hợp lệ: schema_version 2, configurations rỗng |
+| `data/junctions.json` | Cấu hình mẫu hợp lệ: schema_version 2, configs rỗng |
 | `tests/` | Smoke tests cấu trúc, imports, JSON, metadata uv; test thuật toán còn TODO |
 
 Models biểu diễn dữ liệu; Core Logic xử lý nghiệp vụ; UI hiển thị và tiếp nhận thao tác.
@@ -116,3 +116,14 @@ uv run streamlit run src/app.py
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không
 coi các chức năng dự kiến là đã hoạt động.
+
+## Thiết kế UI và lưu trữ Task 5
+
+[Hợp đồng UI/Storage](docs/ui_storage_contracts.md) chốt hai wireframe desktop,
+[JSON mẫu V2.3](docs/examples/junctions_v2.example.json),
+[JSON Schema](docs/schema/junctions_v2.schema.json) và
+[test cases](docs/testcases/ui_storage_testcases.md).
+Khóa danh sách cấu hình chính thức là `configs`. Skeleton `configurations: []`
+ban đầu đã được đổi an toàn vì chưa chứa dữ liệu người dùng.
+Wireframe là tài liệu thiết kế; CRUD, FileStorage, dashboard và mô phỏng chưa
+được kết nối với ứng dụng Streamlit hiện tại.

@@ -87,7 +87,7 @@ class TestPoissonContract:
             poisson_sample(0.3, rng)
 
 
-@pytest.mark.skip(reason="Adaptive chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
+#@pytest.mark.skip(reason="Adaptive chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
 class TestAdaptiveContract:
     @pytest.mark.parametrize(
         "q_ns,q_ew,green_budget,min_green,expected",

@@ -5,7 +5,12 @@
 Dự án **SmartTrafficLight** thuộc học phần Python Module 1, hướng tới mô phỏng
 đèn giao thông thông minh và so sánh cách phân bổ thời gian xanh theo lưu lượng xe.
 Nền tảng ngày **12/10/2026** chỉ gồm bộ khung kiến trúc V2.3, môi trường uv,
-giao diện thông báo và smoke tests. Chưa có mô phỏng hoặc thuật toán hoạt động.
+giao diện thông báo và smoke tests.
+
+Hiện tại đã có Config theo JSON V2, Poisson, Adaptive và đọc/ghi JSON cấu hình.
+Config dùng `rates_per_min`, `motion_2d.enabled` và thời lượng tín hiệu kiểu `int`.
+`data/junctions.json` khởi tạo với `configs: []`; dữ liệu mẫu nằm riêng trong
+`docs/examples/junctions_v2.example.json`. Hai engine và renderer vẫn chưa triển khai.
 
 ## Phạm vi
 
@@ -21,12 +26,12 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 
 | Thư mục / file | Vai trò |
 | --- | --- |
-| `src/models/` | Khung OOP Vehicle, Lane, Config, SignalPlan |
-| `src/core/` | Khung thuật toán, điều phối, hình học, chuyển động, mô phỏng, thống kê, quản lý và lưu trữ |
+| `src/models/` | Config/validation và snapshot đã có; Vehicle, Lane, SignalPlan còn là khung |
+| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; điều phối, chuyển động, mô phỏng, thống kê còn là khung |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
-| `data/junctions.json` | Cấu hình mẫu hợp lệ: schema_version 2, configs rỗng |
-| `tests/` | Smoke tests cấu trúc, imports, JSON, metadata uv; test thuật toán còn TODO |
+| `data/junctions.json` | Cấu hình khởi tạo hợp lệ: schema_version 2, configs rỗng |
+| `tests/` | Smoke tests, thuật toán, hình học/snapshot, Config, JSON và tích hợp Storage → Config → Adaptive |
 
 Models biểu diễn dữ liệu; Core Logic xử lý nghiệp vụ; UI hiển thị và tiếp nhận thao tác.
 Không đặt thuật toán hoặc xử lý nghiệp vụ trong `app.py`.
@@ -39,14 +44,14 @@ và dependencies, không đóng gói ứng dụng thành thư viện Python.
 - **Dictionary**: ánh xạ hướng N/S/E/W tới làn xe, cấu hình và trạng thái.
 - **Queue / collections.deque**: hàng đợi FIFO cho xe đến và rời làn.
 
-Các cấu trúc này chưa được triển khai trong bộ khung hiện tại.
+Dictionary đã được dùng làm chỉ mục cấu hình trong ConfigManager;
+Queue/deque cho mô phỏng chưa được triển khai.
 
-## Thuật toán dự kiến
+## Thuật toán
 
 - **Poisson**: sinh số xe đến theo lưu lượng và khoảng thời gian.
 - **Adaptive + t_min**: phân bổ thời gian xanh theo nhu cầu hai pha và giới hạn
-  thời gian xanh tối thiểu. Công thức và các trường hợp biên sẽ được triển khai,
-  kiểm thử ở giai đoạn thuật toán.
+  thời gian xanh tối thiểu; làm tròn half-up cho NS, EW nhận phần ngân sách còn lại.
 
 ## Cài đặt và chạy
 
@@ -67,8 +72,9 @@ uv run pytest
 uv run python -m py_compile src/app.py
 ```
 
-Smoke tests không chứng minh tính đúng đắn của các thuật toán chưa được viết.
-`tests/test_algorithms.py` chỉ có TODO.
+`tests/test_algorithms.py` kiểm tra Poisson và Adaptive; các test Config/Storage
+kiểm tra JSON V2 và việc truyền thời lượng số nguyên vào Adaptive.
+Các test này chưa kiểm chứng hai engine hoặc mô phỏng chuyển động hoàn chỉnh.
 
 ## Git Flow
 
@@ -107,11 +113,11 @@ uv run streamlit run src/app.py
 | Giai đoạn | Trạng thái / kết quả |
 | --- | --- |
 | 12/10 – Nền tảng V2.3 | Bộ khung, cấu hình mẫu, giao diện hai tab và smoke tests |
-| Models | Dự kiến: Vehicle, Lane, Config, SignalPlan, Dictionary và deque |
-| Thuật toán | Dự kiến: Poisson, Adaptive + t_min và kiểm thử thực tế |
+| Models | Config và snapshot đã có; Vehicle, Lane, SignalPlan và deque chưa triển khai |
+| Thuật toán | Poisson và Adaptive + t_min đã có implementation và kiểm thử |
 | Mô phỏng | Dự kiến: tick 1 giây, chuyển động 2D substep 0,2 giây |
 | UI hoàn chỉnh | Dự kiến: chỉnh cấu hình và hiển thị xe 2D |
-| Lưu trữ / thống kê | Dự kiến: cấu hình JSON và thống kê CSV |
+| Lưu trữ / thống kê | Cấu hình JSON đã có; thống kê CSV chưa triển khai |
 | Tích hợp | Dự kiến: kiểm thử và đánh giá toàn hệ thống |
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không

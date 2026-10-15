@@ -1,7 +1,6 @@
-"""Test hợp đồng thật; test nghiệp vụ SKIP đến khi có implementation.
+"""Kiểm thử hợp đồng Poisson và Adaptive bằng implementation thật.
 
-Ngày 15/10: bỏ skip trên từng class sau khi hiện thực hàm tương ứng.
-P-05 chỉ kiểm tra phép quy đổi đơn vị, không xác nhận Poisson đã hoạt động.
+P-05 chỉ kiểm tra phép quy đổi đơn vị.
 """
 
 from itertools import product
@@ -26,7 +25,7 @@ def test_p05_rate_conversion():
     assert lam == pytest.approx(0.3)
 
 
-@pytest.mark.skip(reason="Poisson chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
+#@pytest.mark.skip(reason="Poisson chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
 class TestPoissonContract:
     def test_p01_zero_lambda(self):
         rng = random.Random(2026)
@@ -87,7 +86,6 @@ class TestPoissonContract:
             poisson_sample(0.3, rng)
 
 
-@pytest.mark.skip(reason="Adaptive chưa triển khai trong Task 3; hiện thực ngày 15/10/2026.")
 class TestAdaptiveContract:
     @pytest.mark.parametrize(
         "q_ns,q_ew,green_budget,min_green,expected",

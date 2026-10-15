@@ -4,8 +4,10 @@
 
 Chốt interface và quy tắc kiểm thử ngày **12/10/2026** để thành viên hiện thực
 thuật toán ngày **15/10/2026** có thể sử dụng cùng một hợp đồng. Tài liệu này
-đặc tả hành vi cần đạt; hai hàm hiện chỉ có signatures, type hints, docstrings
-và `raise NotImplementedError`. Chưa có thuật toán hoặc tích hợp engine hoạt động.
+đặc tả hành vi cần đạt. Poisson và Adaptive hiện đã có implementation và kiểm thử;
+Config dùng thời lượng kiểu int để gọi Adaptive. Tích hợp engine chưa triển khai.
+Các bảng trạng thái chuẩn bị bên dưới ghi lại mốc thiết kế 12/10/2026;
+kết quả kiểm thử hiện tại phải lấy từ lần chạy pytest thực tế.
 
 ## 2. Phạm vi
 
@@ -87,9 +89,9 @@ Số xe đến `A_d(t)` tuân theo `Poisson(lambda_d)`, với xác suất
 `P(A = k) = exp(-lambda) * lambda**k / k!`, k là số nguyên không âm.
 Khi lambda = 0, kết quả luôn là 0.
 
-Phương pháp dự kiến là Knuth: tính cutoff `exp(-lam)`, nhân lần lượt các giá trị
+Phương pháp là Knuth: tính cutoff `exp(-lam)`, nhân lần lượt các giá trị
 `rng.random()` cho đến khi tích không còn lớn hơn cutoff; trả số lần nhân trừ 1.
-Đây là mô tả thiết kế, chưa được viết thành implementation trong Task 3.
+Phương pháp này đã có implementation trong `src/core/algorithms.py`.
 Trong cấu hình V2.3, rate mỗi hướng 0–30 xe/phút nên lambda 0–0,5 ở tick 1 giây.
 Knuth được chọn cho miền nhỏ này; khi mở rộng lambda lớn cần đánh giá hiệu năng
 và underflow thay vì mặc nhiên dùng kết quả của thuật toán ngoài miền đã kiểm thử.
@@ -145,9 +147,8 @@ Adaptive kiểm tra kiểu của cả bốn tham số trước các ràng buộc
 Không tự sửa dữ liệu không hợp lệ. Nội dung thông báo lỗi có thể rõ hơn theo
 tham số, nhưng loại exception phải giữ như hợp đồng.
 
-**Hiện tại cả hai hàm luôn raise NotImplementedError**, kể cả đầu vào hợp lệ
-hoặc không hợp lệ. Các lỗi trong bảng là hành vi cần hiện thực ngày 15/10,
-không phải validation đã hoạt động trong scaffold.
+Hai hàm hiện kiểm tra đầu vào và trả kết quả theo hợp đồng. Các lỗi trong bảng
+được kiểm thử bằng implementation thật; test Adaptive không còn được đánh dấu SKIP.
 
 ## 9. Trường hợp biên
 

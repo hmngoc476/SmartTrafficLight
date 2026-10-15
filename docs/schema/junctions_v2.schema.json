@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SmartTrafficLight junctions JSON V2.3",
+  "description": "Cấu hình chính thức dùng schema_version=2 và configs. Không lưu thống kê hoặc VehicleSnapshot.",
+  "$comment": "ConfigManager còn phải kiểm tra ID duy nhất, green_budget_s >= 2 * min_green_s, dt chia tick với tolerance, số hữu hạn và integer Python không phải bool. uniqueItems không kiểm tra được tính duy nhất của một thuộc tính id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "configs"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 2},
+    "configs": {"type": "array", "items": {"$ref": "#/$defs/config"}}
+  },
+  "$defs": {
+    "nonblank_string": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "positive_seconds": {"type": "integer", "minimum": 1},
+    "positive_number": {"type": "number", "exclusiveMinimum": 0},
+    "nonnegative_number": {"type": "number", "minimum": 0},
+    "rate": {"type": "number", "minimum": 0, "maximum": 30},
+    "queue": {"type": "integer", "minimum": 0, "maximum": 100},
+    "rates_per_min": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["N", "S", "E", "W"],
+      "properties": {
+        "N": {"$ref": "#/$defs/rate"}, "S": {"$ref": "#/$defs/rate"},
+        "E": {"$ref": "#/$defs/rate"}, "W": {"$ref": "#/$defs/rate"}
+      }
+    },
+    "initial_queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["N", "S", "E", "W"],
+      "properties": {
+        "N": {"$ref": "#/$defs/queue"}, "S": {"$ref": "#/$defs/queue"},
+        "E": {"$ref": "#/$defs/queue"}, "W": {"$ref": "#/$defs/queue"}
+      }
+    },
+    "motion_2d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "dt_s", "vehicle_length_m", "min_gap_m", "max_speed_mps", "accel_mps2", "approach_visible_m", "intersection_width_m", "stop_margin_m", "clearance_limit_s"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "dt_s": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "ConfigManager kiểm tra 1/dt gần số nguyên >=1; mặc định 0.2 tạo 5 substep/tick."},
+        "vehicle_length_m": {"$ref": "#/$defs/positive_number"},
+        "min_gap_m": {"$ref": "#/$defs/nonnegative_number"},
+        "max_speed_mps": {"$ref": "#/$defs/positive_number"},
+        "accel_mps2": {"$ref": "#/$defs/positive_number"},
+        "approach_visible_m": {"$ref": "#/$defs/positive_number"},
+        "intersection_width_m": {"$ref": "#/$defs/positive_number"},
+        "stop_margin_m": {"$ref": "#/$defs/nonnegative_number"},
+        "clearance_limit_s": {"$ref": "#/$defs/positive_number"}
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "rates_per_min", "initial_queue", "green_budget_s", "min_green_s", "yellow_s", "all_red_s", "startup_delay_s", "headway_s", "cycles_to_run", "seed", "motion_2d"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonblank_string", "readOnly": true, "description": "ConfigManager cấp ID duy nhất; cập nhật mặc định giữ nguyên ID. readOnly là annotation, không thay thế validation nghiệp vụ."},
+        "name": {"$ref": "#/$defs/nonblank_string"},
+        "rates_per_min": {"$ref": "#/$defs/rates_per_min"},
+        "initial_queue": {"$ref": "#/$defs/initial_queue"},
+        "green_budget_s": {"type": "integer", "minimum": 2, "description": "ConfigManager kiểm tra thêm >=2*min_green_s."},
+        "min_green_s": {"$ref": "#/$defs/positive_seconds"},
+        "yellow_s": {"$ref": "#/$defs/positive_seconds"},
+        "all_red_s": {"$ref": "#/$defs/positive_seconds"},
+        "startup_delay_s": {"type": "integer", "minimum": 0},
+        "headway_s": {"$ref": "#/$defs/positive_seconds"},
+        "cycles_to_run": {"type": "integer", "minimum": 1, "maximum": 100},
+        "seed": {"type": "integer"},
+        "motion_2d": {"$ref": "#/$defs/motion_2d"}
+      }
+    }
+  }
+}

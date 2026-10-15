@@ -5,7 +5,12 @@
 Dự án **SmartTrafficLight** thuộc học phần Python Module 1, hướng tới mô phỏng
 đèn giao thông thông minh và so sánh cách phân bổ thời gian xanh theo lưu lượng xe.
 Nền tảng ngày **12/10/2026** chỉ gồm bộ khung kiến trúc V2.3, môi trường uv,
-giao diện thông báo và smoke tests. Chưa có mô phỏng hoặc thuật toán hoạt động.
+giao diện thông báo và smoke tests.
+
+Hiện tại đã có Config theo JSON V2, Poisson, Adaptive và đọc/ghi JSON cấu hình.
+Config dùng `rates_per_min`, `motion_2d.enabled` và thời lượng tín hiệu kiểu `int`.
+`data/junctions.json` khởi tạo với `configs: []`; dữ liệu mẫu nằm riêng trong
+`docs/examples/junctions_v2.example.json`. Hai engine và renderer vẫn chưa triển khai.
 
 ## Phạm vi
 
@@ -21,12 +26,12 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 
 | Thư mục / file | Vai trò |
 | --- | --- |
-| `src/models/` | Khung OOP Vehicle, Lane, Config, SignalPlan |
-| `src/core/` | Khung thuật toán, điều phối, hình học, chuyển động, mô phỏng, thống kê, quản lý và lưu trữ |
+| `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã có; chưa tích hợp engine |
+| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; điều phối, chuyển động, mô phỏng, thống kê còn là khung |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
-| `data/junctions.json` | Cấu hình mẫu hợp lệ: schema_version 2, configs rỗng |
-| `tests/` | Smoke tests cấu trúc, imports, JSON, metadata uv; test thuật toán còn TODO |
+| `data/junctions.json` | Cấu hình khởi tạo hợp lệ: schema_version 2, configs rỗng |
+| `tests/` | Smoke tests, thuật toán, hình học/snapshot, Config, JSON và tích hợp Storage → Config → Adaptive |
 
 Models biểu diễn dữ liệu; Core Logic xử lý nghiệp vụ; UI hiển thị và tiếp nhận thao tác.
 Không đặt thuật toán hoặc xử lý nghiệp vụ trong `app.py`.
@@ -39,14 +44,14 @@ và dependencies, không đóng gói ứng dụng thành thư viện Python.
 - **Dictionary**: ánh xạ hướng N/S/E/W tới làn xe, cấu hình và trạng thái.
 - **Queue / collections.deque**: hàng đợi FIFO cho xe đến và rời làn.
 
-Các cấu trúc này chưa được triển khai trong bộ khung hiện tại.
+Dictionary đã được dùng làm chỉ mục cấu hình trong ConfigManager;
+Queue/deque cho mô phỏng chưa được triển khai.
 
-## Thuật toán dự kiến
+## Thuật toán
 
 - **Poisson**: sinh số xe đến theo lưu lượng và khoảng thời gian.
 - **Adaptive + t_min**: phân bổ thời gian xanh theo nhu cầu hai pha và giới hạn
-  thời gian xanh tối thiểu. Công thức và các trường hợp biên sẽ được triển khai,
-  kiểm thử ở giai đoạn thuật toán.
+  thời gian xanh tối thiểu; làm tròn half-up cho NS, EW nhận phần ngân sách còn lại.
 
 ## Cài đặt và chạy
 
@@ -67,8 +72,9 @@ uv run pytest
 uv run python -m py_compile src/app.py
 ```
 
-Smoke tests không chứng minh tính đúng đắn của các thuật toán chưa được viết.
-`tests/test_algorithms.py` chỉ có TODO.
+`tests/test_algorithms.py` kiểm tra Poisson và Adaptive; các test Config/Storage
+kiểm tra JSON V2 và việc truyền thời lượng số nguyên vào Adaptive.
+Các test này chưa kiểm chứng hai engine hoặc mô phỏng chuyển động hoàn chỉnh.
 
 ## Git Flow
 
@@ -107,11 +113,11 @@ uv run streamlit run src/app.py
 | Giai đoạn | Trạng thái / kết quả |
 | --- | --- |
 | 12/10 – Nền tảng V2.3 | Bộ khung, cấu hình mẫu, giao diện hai tab và smoke tests |
-| Models | Dự kiến: Vehicle, Lane, Config, SignalPlan, Dictionary và deque |
-| Thuật toán | Dự kiến: Poisson, Adaptive + t_min và kiểm thử thực tế |
+| Models | Config, snapshot, Vehicle, Lane FIFO và SignalPlan đã có; chưa tích hợp engine |
+| Thuật toán | Poisson và Adaptive + t_min đã có implementation và kiểm thử |
 | Mô phỏng | Dự kiến: tick 1 giây, chuyển động 2D substep 0,2 giây |
 | UI hoàn chỉnh | Dự kiến: chỉnh cấu hình và hiển thị xe 2D |
-| Lưu trữ / thống kê | Dự kiến: cấu hình JSON và thống kê CSV |
+| Lưu trữ / thống kê | Cấu hình JSON đã có; thống kê CSV chưa triển khai |
 | Tích hợp | Dự kiến: kiểm thử và đánh giá toàn hệ thống |
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không
@@ -123,17 +129,17 @@ Import API: `from src.models import Config, Motion2DConfig, Vehicle, Lane`.
 Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI.
 
 - `Config()` tự validate; `validate()` kiểm tra lại sau khi chỉnh cấu hình.
-  `arrival_rates` là dictionary N/S/E/W (đề xuất xe/phút, cần xác nhận với Poisson),
-  `initial_queue` là dictionary số xe nguyên mỗi hướng. `motion2d` chứa tham số 2D.
+  `rates_per_min` là dictionary N/S/E/W, đơn vị xe/phút;
+  `initial_queue` là dictionary số xe nguyên mỗi hướng. `motion_2d` chứa tham số 2D
+  và `enabled` kiểu bool. Các thời lượng tín hiệu là int, không nhận float/bool/chuỗi.
   `to_dict()` trả bản sao độc lập; `Config.from_dict(data)` nhận đủ các trường
   của một cấu hình, từ chối trường thiếu/thừa. Không nhận envelope Storage.
 - Default đề xuất: id="default", name="Ngã tư mặc định", lưu lượng 10/hướng,
   queue 0/hướng, green_budget_s=60, min_green_s=10, yellow_s=3, all_red_s=1,
   startup_delay_s=2, headway_s=2, cycles_to_run=10, seed=42.
-  Motion2D: dt_s=0.2, vehicle_length_m=4.5, min_gap_m=2, max_speed_mps=13.9,
-  accel_mps2=2, approach_visible_m=100, intersection_width_m=20,
-  stop_margin_m=0.5, clearance_limit_s=30. Bảng default V2.3 không có trong
-  yêu cầu gửi kèm/repository; cần đối chiếu trước khi tích hợp.
+  Motion2D theo hợp đồng main: enabled=True, dt_s=0.2, vehicle_length_m=4.5,
+  min_gap_m=2, max_speed_mps=9, accel_mps2=2, approach_visible_m=60,
+  intersection_width_m=16, stop_margin_m=0.5, clearance_limit_s=30.
 - `Vehicle` có trường chỉ đọc; dùng `update_motion(s_front_m, speed_mps)`
   để cập nhật tiến, không tự ghi nhận crossing. Xe mới ở s_front_m <= 0.
   Controller kiểm tra tín hiệu, vị trí và xe đầu Lane, rồi gọi `mark_crossed(t)`
@@ -155,10 +161,10 @@ Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI
   `is_cross_eligible(t)` chỉ kiểm tra đồng hồ và Queue, không cấp quyền qua đèn.
   `reset_green_clock()` xóa clock khi kết thúc xanh; không xóa xe.
 
-Storage cần thống nhất tên trường, đơn vị lưu lượng và default ở trên.
-JSON hiện dùng `{"schema_version": 2, "configurations": []}`; tài liệu V2.3
-được đề cập trong yêu cầu dùng `configs`. Chưa đổi JSON hoặc smoke test;
-Storage phải thống nhất envelope riêng với nhóm trước khi nối Config.
+JSON khởi tạo dùng `{"schema_version": 2, "configs": []}` theo hợp đồng main.
+`Config.from_dict()` nhận một phần tử trong `configs`; `to_dict()` trả đúng
+các trường JSON V2, gồm `rates_per_min`, `motion_2d` và `motion_2d.enabled`.
+
 ## Thiết kế UI và lưu trữ Task 5
 
 [Hợp đồng UI/Storage](docs/ui_storage_contracts.md) chốt hai wireframe desktop,

@@ -120,8 +120,9 @@ def test_from_config_bad_allocation(ns, ew, error):
 
 @pytest.mark.parametrize('field', ['yellow_s', 'all_red_s'])
 def test_config_fractional_seconds_not_truncated(field):
-    config = Config(**{field: 3.5})
-    with pytest.raises(ValueError):
+    config = Config()
+    setattr(config, field, 3.5)
+    with pytest.raises(TypeError):
         SignalPlan.from_config(config, 21, 39)
 
 

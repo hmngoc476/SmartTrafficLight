@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "sim_time": 20,
+  "cycle_index": 1,
+  "session_state": "RUNNING",
+  "geometry": {
+    "intersection_width_m": 16.0,
+    "approach_visible_m": 60.0,
+    "lane_offset_m": 2.0,
+    "vehicle_width_m": null
+  },
+  "signals": {
+    "current_segment": "NS_GREEN",
+    "active_phase": "NS",
+    "remaining_s": 20,
+    "signal_colors": {"N": "GREEN", "S": "GREEN", "E": "RED", "W": "RED"}
+  },
+  "metrics": {
+    "queue_lengths": {"N": 1, "S": 1, "E": 1, "W": 1},
+    "initial_total": 3,
+    "total_arrivals": 4,
+    "crossed_stop_total": 3,
+    "exited_world_total": 2,
+    "active_crossing_count": 1,
+    "clearance_hold_s": 0.0
+  },
+  "vehicles": [
+    {"vehicle_id": "V-N-001", "origin": "N", "x": -2.0, "y": -18.0, "speed_mps": 3.0, "motion_state": "APPROACHING", "s_front_m": -10.0, "length_m": 4.5},
+    {"vehicle_id": "V-S-001", "origin": "S", "x": 2.0, "y": 14.0, "speed_mps": 2.0, "motion_state": "APPROACHING", "s_front_m": -6.0, "length_m": 4.5},
+    {"vehicle_id": "V-E-001", "origin": "E", "x": 8.5, "y": -2.0, "speed_mps": 0.0, "motion_state": "STOPPED", "s_front_m": -0.5, "length_m": 4.5},
+    {"vehicle_id": "V-W-001", "origin": "W", "x": -8.5, "y": 2.0, "speed_mps": 0.0, "motion_state": "STOPPED", "s_front_m": -0.5, "length_m": 4.5},
+    {"vehicle_id": "V-N-002", "origin": "N", "x": -2.0, "y": 3.0, "speed_mps": 5.0, "motion_state": "CROSSING", "s_front_m": 11.0, "length_m": 4.5}
+  ]
+}

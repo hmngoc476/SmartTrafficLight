@@ -1,5 +1,10 @@
 # Bàn giao nhiệm vụ Models ngày 14/10/2026
 
+Ghi chú đồng bộ ngày 15/10/2026: phần bàn giao và kết quả kiểm thử ngày 14 dưới đây
+là lịch sử. Config hiện nhận hợp đồng main về JSON V2, tên trường và thời lượng int;
+những mục API tương ứng được cập nhật, các phần tích hợp khác giữ nguyên.
+Kiểm chứng sau đồng bộ bằng `uv run pytest`: 446 passed, không fail hoặc skip.
+
 Đã hoàn thiện trên feat/models để review; chưa commit/push/merge.
 Đây là bàn giao cho nhiệm vụ ngày 14, không thay đổi mặc định Models ngày 13.
 
@@ -47,9 +52,9 @@ Không tự xoay chu kỳ vì Core cần chốt thống kê, kiểm tra số chu
 is_green_for() chỉ kiểm tra tín hiệu; startup/headway/min_gap/crossing vẫn thuộc Core.
 Hướng sai raise TypeError/ValueError thay vì âm thầm trả False.
 
-from_config() kiểm tra Config, budget và min_green; phân bổ xanh phải là int thực sự,
-không nhận bool, float hoặc chuỗi. Config ngày 13 cho phép số thực tại yellow_s/all_red_s:
-3.0/1.0 được chuyển chính xác sang int; 3.5 bị từ chối, không cắt hoặc làm tròn.
+from_config() kiểm tra Config, budget và min_green; phân bổ xanh và mọi thời lượng
+tín hiệu trong Config phải là int thực sự, không nhận bool, float hoặc chuỗi.
+Cả 3.0 và 3.5 đều bị từ chối; không ép kiểu, cắt hoặc làm tròn thời lượng.
 SignalPlan khởi tạo trực tiếp chỉ nhận int cho mọi thời lượng và cycle_no >= 1.
 Kế hoạch giữ bản chụp giá trị, Config đổi sau đó không làm thay đổi lịch đã tạo.
 
@@ -61,21 +66,21 @@ Kế hoạch giữ bản chụp giá trị, Config đổi sau đó không làm t
 file thiết kế trong `../Yêu cầu/`. Tài liệu có mô tả deque quay vòng; yêu cầu
 nhiệm vụ này ưu tiên mỗi SignalPlan chỉ biểu diễn một chu kỳ, không tự xoay.
 
-| Repository | Tài liệu V2.3 | Đề xuất thống nhất |
+| Hợp đồng đã nhận từ main | Biểu diễn trong Models | Quy tắc |
 | --- | --- | --- |
-| configurations | configs | Storage thống nhất envelope hoặc migration rõ ràng |
-| arrival_rates | rates_per_min | Storage ánh xạ tên ở biên, giữ API đang dùng |
-| motion2d | motion_2d | Storage ánh xạ tên ở biên, không đổi Models tự động |
-| Không có enabled | motion_2d.enabled | Nhóm quyết định thêm trường hay mô phỏng luôn bật |
+| configs | Danh sách chứa các Config dạng dict | JSON khởi tạo rỗng, mẫu nằm riêng trong docs/examples |
+| rates_per_min | rates_per_min | Dictionary đủ N/S/E/W, đơn vị xe/phút |
+| motion_2d | motion_2d | Tên trường chuẩn JSON V2 |
+| motion_2d.enabled | Motion2DConfig.enabled | Boolean, giữ giá trị khi đọc/ghi |
 
 Tài liệu mẫu dùng rates 12/9/18/7, queue 7/4/16/5, seed 2026,
 max_speed_mps=9, approach_visible_m=60, intersection_width_m=16;
-Config ngày 13 có default khác. Đây là cấu hình mẫu tài liệu, không tự ghi đè
-default đang dùng. arrival_rates được đề xuất xe/phút, phù hợp tên rates_per_min.
-Config.from_dict() hiện nhận đủ tên trường repository và từ chối trường thừa;
-không thể nạp trực tiếp JSON mẫu V2.3 nếu chưa có ánh xạ được nhóm thống nhất.
+Default 2D đã đồng bộ main với max_speed_mps=9, approach_visible_m=60,
+intersection_width_m=16. Các giá trị lưu lượng, queue và seed của Config() vẫn
+có thể khác cấu hình mẫu. Config.from_dict() nạp trực tiếp một phần tử của JSON
+V2, yêu cầu đủ trường và từ chối alias cũ arrival_rates/motion2d.
 
-## Kiểm chứng
+## Kiểm chứng lịch sử trước đồng bộ main
 
 Các lệnh uv dùng cache trong repository vì cache mặc định của tài khoản Admin
 không phù hợp quyền sandbox:

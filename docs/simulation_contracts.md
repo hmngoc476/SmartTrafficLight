@@ -2,6 +2,12 @@
 
 ## 1. Mục tiêu và phạm vi Task 4
 
+**Quyết định interface nhóm ngày 15/10/2026:** trực tiếp gọi
+`geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)` khi cần tọa độ.
+Bỏ `Vehicle.to_xy()` và hàm độc lập `core.geometry.to_xy()`. Đây là
+**điều chỉnh public API so với thiết kế V2.3 gốc**, không thay đổi toán học
+hình học V2.3. Các nhánh Models/Simulation/UI phải nhận cập nhật này.
+
 Task 4 thuộc mốc thiết kế **12/10/2026**, được thực hiện ngày **13/10/2026**.
 Chốt tọa độ N/S/E/W, Geometry, snapshot chỉ đọc và dữ liệu mẫu để nhóm UI có
 thể phát triển renderer trước khi có engine. Phần đã hiện thực chỉ gồm hình học
@@ -58,7 +64,7 @@ engine chỉ ghi crossing khi GREEN, startup delay/headway hợp lệ và xe là
 `crossed_stop_t` là căn cứ sự kiện đã xảy ra. Tại đúng s=0, ownership tùy sự kiện,
 không suy ra chỉ từ tọa độ; trong snapshot biểu diễn bằng motion_state.
 Khởi tạo hàng chờ ở s=-stop_margin_m, không tự đánh dấu crossing ở lúc enqueue.
-Hàm `to_xy` không xét đèn hoặc thay đổi trạng thái crossing.
+Phương thức `Geometry.lane_to_xy()` không xét đèn hoặc thay đổi trạng thái crossing.
 
 ## 5. Công thức ánh xạ
 
@@ -138,7 +144,7 @@ Occupancy/AABB/clearance hiện **chưa có implementation**. `is_conflict_clear
 tương lai chỉ True nếu mọi xe active_crossing đều không giao vùng xung đột;
 xe còn trong active_crossing nhưng đã ra khỏi vùng không giữ đỏ nữa.
 
-## 8. Hợp đồng Geometry và to_xy
+## 8. Hợp đồng Geometry.lane_to_xy
 
 Các public API đã hiện thực:
 
@@ -147,12 +153,12 @@ Geometry(...)                         # frozen dataclass, đơn vị mét
 geometry.stop_point(direction) -> tuple[float, float]
 geometry.conflict_bounds              # tuple[float, float, float, float]
 geometry.to_snapshot() -> GeometrySnapshot
-to_xy(direction: str, s_front_m: float, geometry: Geometry) -> tuple[float, float]
+geometry.lane_to_xy(origin: str, s_front_m: float) -> tuple[float, float]
 ```
 
 Direction chỉ nhận N/S/E/W; "X", chữ thường và giá trị thiếu gây ValueError.
 s nhận int/float hữu hạn, không nhận bool; kiểu sai gây TypeError, NaN/inf gây
-ValueError. geometry phải là Geometry. Kết quả là tuple hai float bằng mét.
+ValueError. Gọi trực tiếp trên đối tượng Geometry. Kết quả là tuple hai float bằng mét.
 Hàm thuần: cùng đầu vào cho cùng kết quả, không đổi s, Vehicle, Queue, tín hiệu
 hoặc viewport. Geometry không sinh Poisson, tính xanh, điều khiển đèn hay ghi file.
 
@@ -165,9 +171,10 @@ Ví dụ cho Geometry mặc định (**tọa độ minh họa được đề xu�
 | E | (8,-2) | y=-2 | (18,-2) | (8,-2) | (-2,-2) |
 | W | (-8,2) | y=2 | (-18,2) | (-8,2) | (2,2) |
 
-Khi width=20, offset=3, `to_xy("N", -4, geometry)` = (-3,-14).
-Chỉ có một implementation chuyển tọa độ; Vehicle/MovementEngine tương lai gọi
-hàm này hoặc tạo wrapper mỏng, không sao chép bốn công thức ở các module.
+Khi width=20, offset=3, `geometry.lane_to_xy("N", -4)` = (-3,-14).
+Chỉ có một implementation chuyển tọa độ. Core/MovementEngine gọi trực tiếp
+`geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)`; Vehicle không chứa
+`to_xy()` hay công thức hình học. Không duy trì wrapper thứ hai.
 
 ## 9. SimulationSnapshot và nguồn định nghĩa
 
@@ -312,11 +319,11 @@ không có xe cùng lúc ở Queue và active. Snapshot chưa chứng minh lịc
 
 | Mã | Tình huống / expected | Trạng thái phạm vi Task 4 |
 | --- | --- | --- |
-| G-01 | N: s âm phía Bắc vạch; s tăng làm y tăng | Test implementation to_xy |
-| G-02 | S: s âm phía Nam vạch; s tăng làm y giảm | Test implementation to_xy |
-| G-03 | E: s âm phía Đông vạch; s tăng làm x giảm | Test implementation to_xy |
-| G-04 | W: s âm phía Tây vạch; s tăng làm x tăng | Test implementation to_xy |
-| G-05 | direction X → ValueError | Test implementation to_xy |
+| G-01 | N: s âm phía Bắc vạch; s tăng làm y tăng | Test Geometry.lane_to_xy |
+| G-02 | S: s âm phía Nam vạch; s tăng làm y giảm | Test Geometry.lane_to_xy |
+| G-03 | E: s âm phía Đông vạch; s tăng làm x giảm | Test Geometry.lane_to_xy |
+| G-04 | W: s âm phía Tây vạch; s tăng làm x tăng | Test Geometry.lane_to_xy |
+| G-05 | direction X → ValueError | Test Geometry.lane_to_xy |
 | G-06 | Sửa field, tuple, mapping bị chặn; sửa input/export không đổi DTO | Test DTO đã hiện thực, không phải engine |
 | G-07 | ID trùng → ValueError | Test DTO đã hiện thực |
 | G-08 | Queue/active rời nhau, counters khớp mẫu | Test dữ liệu mẫu đã hiện thực |
@@ -353,7 +360,7 @@ Trên checkout sạch, dùng lệnh pytest thông thường. Không xóa bản c
 - Review **ĐỀ XUẤT THIẾT KẾ**: offset 2m, vạch tại biên giao lộ, viewport ±68m,
   bề rộng xe cần bổ sung, schema snapshot v1 và các field/enum cụ thể.
 - Hiện thực Vehicle/Lane và builder đọc scalar để tạo DTO; cập nhật x/y bằng
-  to_xy duy nhất. Đảm bảo snapshot đồng bộ và không lộ tham chiếu mutable Core.
+  Geometry.lane_to_xy duy nhất. Đảm bảo snapshot đồng bộ và không lộ tham chiếu mutable Core.
 - Hiện thực MovementEngine: front→back, gia tốc, stop_limit, gap, startup/headway,
   CrossingEvent/ExitedEvent đúng một lần; thêm test G-08/G-09 động.
 - Chốt width rồi hiện thực AABB, is_conflict_clear và clearance hold/timeout.

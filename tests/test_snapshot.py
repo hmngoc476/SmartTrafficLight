@@ -10,7 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.core.geometry import Geometry, to_xy
+from src.core.geometry import Geometry
 from src.models.snapshot import SignalSnapshot, SimulationSnapshot
 
 
@@ -90,7 +90,7 @@ def test_example_coordinates_and_gap(example_data):
     geometry = Geometry()
     assert snapshot.geometry == geometry.to_snapshot()
     for vehicle in snapshot.vehicles:
-        assert (vehicle.x, vehicle.y) == to_xy(vehicle.origin, vehicle.s_front_m, geometry)
+        assert (vehicle.x, vehicle.y) == geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)
         assert vehicle.motion_state != "EXITED"
     leader = next(vehicle for vehicle in snapshot.vehicles if vehicle.vehicle_id == "V-N-002")
     follower = next(vehicle for vehicle in snapshot.vehicles if vehicle.vehicle_id == "V-N-001")

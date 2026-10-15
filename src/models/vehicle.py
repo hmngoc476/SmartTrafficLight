@@ -1,7 +1,6 @@
 """Phương tiện và các sự kiện do Core xác nhận."""
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
-from typing import Protocol
 from src.models.config import direction, number, text
 
 
@@ -10,11 +9,6 @@ class MotionState(StrEnum):
     STOPPED = 'STOPPED'
     CROSSING = 'CROSSING'
     EXITED = 'EXITED'
-
-
-class GeometryProtocol(Protocol):
-    """Geometry cần cung cấp phép đổi tọa độ này để tích hợp Models."""
-    def lane_to_xy(self, origin: str, s_front_m: float) -> tuple[float, float]: ...
 
 
 @dataclass(frozen=True, eq=False)
@@ -99,10 +93,6 @@ class Vehicle:
         if self.crossed_stop_t is None:
             return None
         return self.crossed_stop_t - self.arrival_t
-
-    def to_xy(self, geometry: GeometryProtocol) -> tuple[float, float]:
-        """Ủy quyền đổi tọa độ cho Geometry, không xây dựng hình học tại đây."""
-        return geometry.lane_to_xy(self.origin, self.s_front_m)
 
     def snapshot(self) -> dict[str, str | float | None]:
         """Bản chụp độc lập, chỉ chứa giá trị thuần Python phục vụ UI/thống kê."""

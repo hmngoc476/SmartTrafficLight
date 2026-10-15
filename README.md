@@ -148,7 +148,8 @@ Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI
   xe rời khung. Các thời điểm sự kiện cùng hệ thời gian mô phỏng, đơn vị giây.
   `elapsed_to_stopline()` trả None trước crossing; `add_stopped_delay(dt_s)`
   cộng thời gian đứng yên trước crossing; `snapshot()` phục vụ UI/thống kê.
-  `to_xy(geometry)` cần `geometry.lane_to_xy(origin, s_front_m) -> (x, y)`.
+  Core lấy tọa độ bằng `geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)`.
+  Vehicle không giữ `to_xy()`; công thức hình học chỉ có trong Geometry.
 - `Lane(direction)` dùng deque; `enqueue(vehicle)` yêu cầu thứ tự arrival_t
   không giảm (cùng thời điểm theo thứ tự enqueue). ID không được tái sử dụng
   trong cùng Lane kể cả sau khi pop. Core cấp ID duy nhất toàn mô phỏng.

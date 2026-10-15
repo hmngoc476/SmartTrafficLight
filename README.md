@@ -26,7 +26,7 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 
 | Thư mục / file | Vai trò |
 | --- | --- |
-| `src/models/` | Config/validation và snapshot đã có; Vehicle, Lane, SignalPlan còn là khung |
+| `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã có; chưa tích hợp engine |
 | `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; điều phối, chuyển động, mô phỏng, thống kê còn là khung |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
@@ -113,7 +113,7 @@ uv run streamlit run src/app.py
 | Giai đoạn | Trạng thái / kết quả |
 | --- | --- |
 | 12/10 – Nền tảng V2.3 | Bộ khung, cấu hình mẫu, giao diện hai tab và smoke tests |
-| Models | Config và snapshot đã có; Vehicle, Lane, SignalPlan và deque chưa triển khai |
+| Models | Config, snapshot, Vehicle, Lane FIFO và SignalPlan đã có; chưa tích hợp engine |
 | Thuật toán | Poisson và Adaptive + t_min đã có implementation và kiểm thử |
 | Mô phỏng | Dự kiến: tick 1 giây, chuyển động 2D substep 0,2 giây |
 | UI hoàn chỉnh | Dự kiến: chỉnh cấu hình và hiển thị xe 2D |
@@ -122,6 +122,48 @@ uv run streamlit run src/app.py
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không
 coi các chức năng dự kiến là đã hoạt động.
+
+## Models triển khai ngày 13/10/2026
+
+Import API: `from src.models import Config, Motion2DConfig, Vehicle, Lane`.
+Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI.
+
+- `Config()` tự validate; `validate()` kiểm tra lại sau khi chỉnh cấu hình.
+  `rates_per_min` là dictionary N/S/E/W, đơn vị xe/phút;
+  `initial_queue` là dictionary số xe nguyên mỗi hướng. `motion_2d` chứa tham số 2D
+  và `enabled` kiểu bool. Các thời lượng tín hiệu là int, không nhận float/bool/chuỗi.
+  `to_dict()` trả bản sao độc lập; `Config.from_dict(data)` nhận đủ các trường
+  của một cấu hình, từ chối trường thiếu/thừa. Không nhận envelope Storage.
+- Default đề xuất: id="default", name="Ngã tư mặc định", lưu lượng 10/hướng,
+  queue 0/hướng, green_budget_s=60, min_green_s=10, yellow_s=3, all_red_s=1,
+  startup_delay_s=2, headway_s=2, cycles_to_run=10, seed=42.
+  Motion2D theo hợp đồng main: enabled=True, dt_s=0.2, vehicle_length_m=4.5,
+  min_gap_m=2, max_speed_mps=9, accel_mps2=2, approach_visible_m=60,
+  intersection_width_m=16, stop_margin_m=0.5, clearance_limit_s=30.
+- `Vehicle` có trường chỉ đọc; dùng `update_motion(s_front_m, speed_mps)`
+  để cập nhật tiến, không tự ghi nhận crossing. Xe mới ở s_front_m <= 0.
+  Controller kiểm tra tín hiệu, vị trí và xe đầu Lane, rồi gọi `mark_crossed(t)`
+  một lần khi đầu xe tới/vượt vạch, ngay sau đó `Lane.pop_crossed()` và chuyển
+  xe sang active_crossing. `mark_exited(t)` dùng sau crossing khi Core xác nhận
+  xe rời khung. Các thời điểm sự kiện cùng hệ thời gian mô phỏng, đơn vị giây.
+  `elapsed_to_stopline()` trả None trước crossing; `add_stopped_delay(dt_s)`
+  cộng thời gian đứng yên trước crossing; `snapshot()` phục vụ UI/thống kê.
+  `to_xy(geometry)` cần `geometry.lane_to_xy(origin, s_front_m) -> (x, y)`.
+- `Lane(direction)` dùng deque; `enqueue(vehicle)` yêu cầu thứ tự arrival_t
+  không giảm (cùng thời điểm theo thứ tự enqueue). ID không được tái sử dụng
+  trong cùng Lane kể cả sau khi pop. Core cấp ID duy nhất toàn mô phỏng.
+  `peek()` xem đầu, `pop_crossed()` lấy đầu đã crossing; cả hai trả None khi rỗng.
+  Pop khi đầu chưa crossing raise ValueError và giữ nguyên Queue.
+  `get_vehicles()` trả tuple, `count()` đếm mọi xe còn trong Queue.
+- Controller gọi `reset_green_clock(started_at, startup_delay_s, headway_s)`
+  khi bắt đầu xanh: thời điểm đủ điều kiện đầu tiên là start + startup delay.
+  Sau pop, đồng hồ kế tiếp là max(đồng hồ cũ, crossed_stop_t + headway).
+  `is_cross_eligible(t)` chỉ kiểm tra đồng hồ và Queue, không cấp quyền qua đèn.
+  `reset_green_clock()` xóa clock khi kết thúc xanh; không xóa xe.
+
+JSON khởi tạo dùng `{"schema_version": 2, "configs": []}` theo hợp đồng main.
+`Config.from_dict()` nhận một phần tử trong `configs`; `to_dict()` trả đúng
+các trường JSON V2, gồm `rates_per_min`, `motion_2d` và `motion_2d.enabled`.
 
 ## Thiết kế UI và lưu trữ Task 5
 

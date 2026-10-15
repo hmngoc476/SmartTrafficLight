@@ -1,8 +1,4 @@
-"""Hợp đồng Poisson và Adaptive theo V2.3; implementation còn TODO.
-
-Task 3 ngày 12/10/2026 chỉ chốt interface. Chi tiết và test case nằm trong
-docs/algorithm_contracts.md. Không có thuật toán hoạt động trong module này.
-"""
+"""Poisson và Adaptive theo hợp đồng V2.3 trong docs/algorithm_contracts.md."""
 
 from typing import Protocol
 import math
@@ -79,7 +75,7 @@ def allocate_green_adaptive(
     green_budget: int,
     min_green: int,
 ) -> tuple[int, int]:
-    """TODO: Phân bổ xanh NS/EW từ snapshot Queue đầu chu kỳ.
+    """Phân bổ xanh NS/EW từ snapshot Queue đầu chu kỳ.
 
     Args:
         q_ns: Tổng xe chưa vượt vạch của N/S, số nguyên >= 0.
@@ -96,7 +92,6 @@ def allocate_green_adaptive(
     Raises:
         TypeError: Một tham số không phải int hoặc là bool.
         ValueError: Queue âm, min_green < 1 hoặc ngân sách không đủ.
-        NotImplementedError: Trạng thái hiện tại của scaffold Task 3.
 
     Hợp đồng ngày 15/10: validate trước khi chia. Nếu tổng Queue > 0,
     giai đoạn A chia green_budget theo tỷ trọng Queue, không cộng t_min
@@ -106,4 +101,43 @@ def allocate_green_adaptive(
     Hàm thuần, không sửa Queue hoặc lịch đang chạy; caller chốt kết quả
     cho toàn chu kỳ và chỉ gọi lại khi chu kỳ mới bắt đầu.
     """
-    raise NotImplementedError("Adaptive chưa được triển khai; dự kiến ngày 15/10/2026.")
+    parameters = {
+        "q_ns": q_ns,
+        "q_ew": q_ew,
+        "green_budget": green_budget,
+        "min_green": min_green,
+    }
+    for name, value in parameters.items():
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} phải là int và không được là bool.")
+
+    if q_ns < 0:
+        raise ValueError("q_ns phải >= 0.")
+    if q_ew < 0:
+        raise ValueError("q_ew phải >= 0.")
+    if min_green < 1:
+        raise ValueError("min_green phải >= 1.")
+    if green_budget < 2 * min_green:
+        raise ValueError("green_budget phải >= 2 * min_green.")
+
+    total_queue = q_ns + q_ew
+    if total_queue == 0:
+        green_ns = green_budget // 2
+    else:
+        green_ns_raw = green_budget * q_ns / total_queue
+        green_ew_raw = green_budget * q_ew / total_queue
+
+        if green_ns_raw < min_green:
+            delta = min_green - green_ns_raw
+            green_ns_raw = float(min_green)
+            green_ew_raw -= delta
+        elif green_ew_raw < min_green:
+            delta = min_green - green_ew_raw
+            green_ew_raw = float(min_green)
+            green_ns_raw -= delta
+
+        green_ns = math.floor(green_ns_raw + 0.5)
+        green_ns = max(min_green, min(green_ns, green_budget - min_green))
+
+    green_ew = green_budget - green_ns
+    return green_ns, green_ew

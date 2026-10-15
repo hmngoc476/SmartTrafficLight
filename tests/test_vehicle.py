@@ -6,6 +6,7 @@ from dataclasses import FrozenInstanceError
 import json
 import pytest
 from src.models.vehicle import Vehicle, MotionState
+from src.core.geometry import Geometry
 
 
 def test_vehicle_lifecycle():
@@ -76,11 +77,10 @@ def test_crossing_guards_and_exit_guards():
 
 def test_delay_and_geometry_contract():
     v = Vehicle('v', 'W')
-    class FakeGeometry:
-        def lane_to_xy(self, origin, s_front_m):
-            assert origin == 'W'
-            return (s_front_m, 2.0)
-    assert v.to_xy(FakeGeometry()) == (-100, 2)
+    # Core sử dụng trực tiếp Geometry thật; Vehicle không có to_xy.
+    geometry = Geometry()
+    assert not hasattr(v, 'to_xy')
+    assert geometry.lane_to_xy(v.origin, v.s_front_m) == (-108.0, 2.0)
     for dt in (-1, float('nan'), True):
         with pytest.raises((ValueError, TypeError)):
             v.add_stopped_delay(dt)

@@ -1,5 +1,10 @@
 # Bàn giao nhiệm vụ Models ngày 14/10/2026
 
+Ghi chú API ngày 15/10/2026: nhóm chốt bỏ `Vehicle.to_xy()`/`GeometryProtocol` và
+gọi trực tiếp `Geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)`.
+Đây là thay đổi hợp đồng so với V2.3 gốc; Models chỉ giữ dữ liệu Vehicle,
+Geometry sở hữu công thức tọa độ. Test tích hợp dùng hai đối tượng thật.
+
 Ghi chú đồng bộ ngày 15/10/2026: phần bàn giao và kết quả kiểm thử ngày 14 dưới đây
 là lịch sử. Config hiện nhận hợp đồng main về JSON V2, tên trường và thời lượng int;
 những mục API tương ứng được cập nhật, các phần tích hợp khác giữ nguyên.

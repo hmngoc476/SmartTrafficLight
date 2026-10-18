@@ -1,5 +1,10 @@
 # Hợp đồng hình học 2D và SimulationSnapshot
 
+Cập nhật đến 17/10: hai engine, Controller và Statistics đã hiện thực trên
+feat/simulation; xem [hợp đồng runtime ngày 17](simulation_day17.md) và
+[hợp đồng Controller](controller_contracts.md). Các trạng thái Task 4 bên dưới
+ghi lại mốc thiết kế trước implementation; ví dụ JSON vẫn là fixture tĩnh.
+
 ## 1. Mục tiêu và phạm vi Task 4
 
 **Quyết định interface nhóm ngày 15/10/2026:** trực tiếp gọi
@@ -140,7 +145,8 @@ họa bổ sung, nhưng phải xác nhận và ghi vào cấu hình trước khi
 cho `is_conflict_clear()` chỉ vì thiếu thông tin. Width hiển thị bằng pixel
 trong UI không được xem là kích thước vật lý của xe.
 
-Occupancy/AABB/clearance hiện **chưa có implementation**. `is_conflict_clear()`
+Occupancy/AABB vật lý chưa được nghiệm thu. `is_conflict_clear()` hiện có
+kiểm tra dọc làn cơ bản; mô hình hình bao theo mô tả dưới đây thuộc task 18 và
 tương lai chỉ True nếu mọi xe active_crossing đều không giao vùng xung đột;
 xe còn trong active_crossing nhưng đã ra khỏi vùng không giữ đỏ nữa.
 
@@ -236,7 +242,7 @@ Các mapping màu/counters được chép thành dict mới, kiểm tra leaf là
 scalar hợp lệ và bọc MappingProxyType. Frozen đơn thuần không đủ cho dict/list.
 
 UI không nhận Lane.queue hay active_crossing; không sửa Vehicle thực tế, timer,
-không gọi popleft và không sửa state/time của engine. Builder tương lai đọc
+không gọi popleft và không sửa state/time của engine. Builder của SimulationEngine đọc
 scalar từ Core rồi tạo DTO; không gắn đối tượng nghiệp vụ vào một trường mới.
 
 `snapshot.to_dict()` tạo dict/list JSON mới, có thể sửa để phục vụ UI mà không
@@ -269,7 +275,7 @@ Khi đuôi xe vượt giới hạn thế giới hiển thị, ghi exited_world_t
 tăng exited_world_total, không tăng crossed lần hai. **ĐỀ XUẤT THIẾT KẾ:** viewport
 đối xứng có biên ±(width/2 + approach_visible_m), mặc định ±68m; renderer clip
 xe ngoài viewport nhưng không tự thực hiện EXITED. Xe Queue ngoài viewport vẫn
-có trong snapshot và counters. Quy tắc EXITED do MovementEngine xử lý tương lai.
+có trong snapshot và counters. Quy tắc EXITED hiện được MovementEngine xử lý; nghiệm thu biên viewport thuộc task 18.
 
 ## 13. min_gap, tín hiệu, clearance và nhịp thời gian
 
@@ -371,4 +377,4 @@ Trên checkout sạch, dùng lệnh pytest thông thường. Không xóa bản c
 - Chạy test tích hợp trạng thái, gap, clearance, Pause/Step/Reset và bảo toàn xe.
 
 Phần cần nhóm xác nhận được đánh dấu rõ; chưa có quyết định nào về bề rộng xe
-được coi là thông số chính thức của V2.3. Hai engine vẫn ở trạng thái TODO.
+được coi là thông số chính thức của V2.3. Trạng thái engine hiện tại được cập nhật tại simulation_day17.md.

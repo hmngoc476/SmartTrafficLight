@@ -1,53 +1,28 @@
-"""SimulationEngine điều phối toàn bộ mô phỏng ngã tư thông minh.
-
-Nhiệm vụ:
-- Quản lý vòng đời phiên: start, tick, pause, resume, stop, reset, snapshot.
-- Sở hữu sim_time và cycle_index.
-- Tuân thủ quy tắc R3 (Clearance timeout) và R4 (Tick và chu kỳ):
-  - Trong [t, t+1), xe di chuyển theo tín hiệu tại t.
-  - Cuối khoảng, lấy occupancy (conflict_clear), gọi Controller.tick(conflict_clear=...),
-    cập nhật sim_time=t+1, chốt snapshot tại ranh giới mới.
-  - Ghi nhận sự kiện vượt/ra thế giới theo chuyển động đã xảy ra; không gán cho tín hiệu mới.
-  - Khi ALL_RED_2 kết thúc an toàn, chốt metrics chu kỳ cũ, kiểm tra cycles_to_run.
-    Nếu còn, truyền cycle_index + 1 và Queue mới cho Controller; chỉ cập nhật index sau khi thành công.
-  - Nếu hết chu kỳ, giữ ALL_RED_2, remaining_s=0, chuyển sang COMPLETED.
-  - Nếu timeout/in_error, Controller giữ ALL_RED và in_error=True; Engine chuyển session sang ERROR và dừng tick.
-"""
+"""Điều phối phiên, tick 1s, Movement substep và thống kê đến task 17/10."""
 
 import random
-from collections.abc import Mapping
-from typing import Literal
 
 from src.core.algorithms import poisson_sample
 from src.core.controller import TrafficLightController
 from src.core.geometry import Geometry
 from src.core.movement import MovementEngine
-from src.models.config import Config
+from src.core.statistics import SimulationStats
+from src.models.config import Config, integer
 from src.models.lane import Lane
-from src.models.snapshot import (
-    DIRECTIONS,
-    Direction,
-    MetricsSnapshot,
-    SessionState,
-    SimulationSnapshot,
-    VehicleSnapshot,
-)
+from src.models.snapshot import DIRECTIONS, MetricsSnapshot, SessionState, SimulationSnapshot, VehicleSnapshot
 
 
 class SimulationEngine:
-    """SimulationEngine vận hành độc lập UI, điều phối Controller, Movement và sinh xe Poisson."""
-
     def __init__(self, config: Config) -> None:
         if not isinstance(config, Config):
-            raise TypeError("config phải là instance của Config.")
+            raise TypeError('config phải là Config.')
         config.validate()
         self._config = Config.from_dict(config.to_dict())
-
-        self._sim_time: int = 0
-        self._cycle_index: int = 1
-        self._session_state: SessionState = "PAUSED"  # Sẵn sàng start() -> RUNNING
+        self._sim_time = 0
+        self._cycle_index = 1
+        self._session_state: SessionState = 'PAUSED'
+        self._started = False
         self._rng = random.Random(self._config.seed)
-
         self._geometry = Geometry(
             intersection_width_m=self._config.motion_2d.intersection_width_m,
             approach_visible_m=self._config.motion_2d.approach_visible_m,
@@ -55,28 +30,14 @@ class SimulationEngine:
             min_gap_m=self._config.motion_2d.min_gap_m,
             stop_margin_m=self._config.motion_2d.stop_margin_m,
         )
-
-        self._lanes: dict[str, Lane] = {d: Lane(d) for d in DIRECTIONS}
+        self._lanes = {d: Lane(d) for d in DIRECTIONS}
         self._controller = TrafficLightController(self._config)
         self._movement = MovementEngine(self._config, self._lanes, self._geometry)
-
-        # Counters theo dõi toàn phiên
-        self._initial_total: int = 0
-        self._total_arrivals: int = 0
-        self._crossed_stop_total: int = 0
-        self._exited_world_total: int = 0
-
-        # Khởi tạo ban đầu (initial queue)
-        self._initialize_queues()
-
-        # Bắt đầu chu kỳ 1 trên Controller
-        queue_lengths = {d: self._lanes[d].count() for d in DIRECTIONS}
-        self._controller.start_next_cycle(
-            queue_lengths,
-            cycle_no=self._cycle_index,
-            started_at=self._sim_time,
-            conflict_clear=True,
-        )
+        for direction in DIRECTIONS:
+            self._movement.initialize_queue(direction, self._config.initial_queue[direction])
+        self._initial_total = sum(self._config.initial_queue.values())
+        self._stats = SimulationStats(self._initial_total)
+        self._activate_cycle(self._queue_lengths(), 1, conflict_clear=True)
         self._update_lane_green_clocks()
 
     @property
@@ -99,213 +60,137 @@ class SimulationEngine:
     def movement(self) -> MovementEngine:
         return self._movement
 
-    def _initialize_queues(self) -> None:
-        """Tạo các xe ban đầu theo initial_queue trong config."""
-        for direction in DIRECTIONS:
-            count = self._config.initial_queue.get(direction, 0)
-            for _ in range(count):
-                self._movement.spawn_and_enqueue(direction, arrival_t=0.0)
-                self._initial_total += 1
+    @property
+    def stats(self) -> SimulationStats:
+        return self._stats
+
+    def _queue_lengths(self) -> dict[str, int]:
+        return {d: self._lanes[d].count() for d in DIRECTIONS}
+
+    def _activate_cycle(self, queues, cycle_index: int, *, conflict_clear: bool) -> None:
+        self._controller.start_next_cycle(
+            queues, cycle_no=cycle_index, started_at=self._sim_time, conflict_clear=conflict_clear,
+        )
+        self._cycle_index = cycle_index
+        # Ngay sau activation đang ở đầu NS_GREEN; không gọi lại Adaptive để đọc plan.
+        green_ns = self._controller.remaining_s
+        self._stats.begin_cycle(cycle_index, self._sim_time, queues,
+                                green_ns, self._config.green_budget_s - green_ns)
 
     def _update_lane_green_clocks(self) -> None:
-        """Thông báo reset_green_clock cho các Lane khi tín hiệu chuyển GREEN."""
-        seg_code = self._controller.current_segment_code
-        if seg_code == "NS_GREEN":
-            self._lanes["N"].reset_green_clock(
-                started_at=float(self._sim_time),
-                startup_delay_s=float(self._config.startup_delay_s),
-                headway_s=float(self._config.headway_s),
-            )
-            self._lanes["S"].reset_green_clock(
-                started_at=float(self._sim_time),
-                startup_delay_s=float(self._config.startup_delay_s),
-                headway_s=float(self._config.headway_s),
-            )
-            self._lanes["E"].reset_green_clock(None)
-            self._lanes["W"].reset_green_clock(None)
-        elif seg_code == "EW_GREEN":
-            self._lanes["E"].reset_green_clock(
-                started_at=float(self._sim_time),
-                startup_delay_s=float(self._config.startup_delay_s),
-                headway_s=float(self._config.headway_s),
-            )
-            self._lanes["W"].reset_green_clock(
-                started_at=float(self._sim_time),
-                startup_delay_s=float(self._config.startup_delay_s),
-                headway_s=float(self._config.headway_s),
-            )
-            self._lanes["N"].reset_green_clock(None)
-            self._lanes["S"].reset_green_clock(None)
-        else:
-            for d in DIRECTIONS:
-                self._lanes[d].reset_green_clock(None)
+        for direction, lane in self._lanes.items():
+            if self._controller.is_green_for(direction):
+                if lane.green_started_at is None:
+                    lane.reset_green_clock(self._sim_time, self._config.startup_delay_s,
+                                           self._config.headway_s)
+            elif lane.green_started_at is not None:
+                lane.reset_green_clock()
 
     def start(self) -> None:
-        """Bắt đầu chạy mô phỏng."""
-        if self._session_state in ("COMPLETED", "ERROR"):
-            raise RuntimeError(f"Không thể start từ trạng thái {self._session_state}.")
-        self._session_state = "RUNNING"
+        """Start chỉ kích hoạt phiên mới; phiên đã dừng cần Reset hoặc Engine mới."""
+        if self._started or self._session_state != 'PAUSED':
+            raise RuntimeError('Start yêu cầu phiên mới; dùng Resume hoặc Reset đúng trạng thái.')
+        self._started = True
+        self._session_state = 'RUNNING'
 
     def pause(self) -> None:
-        """Tạm dừng mô phỏng."""
-        if self._session_state == "RUNNING":
-            self._session_state = "PAUSED"
+        if self._session_state != 'RUNNING':
+            raise RuntimeError('Chỉ Pause khi RUNNING.')
+        self._session_state = 'PAUSED'
 
     def resume(self) -> None:
-        """Tiếp tục mô phỏng khi đang pause."""
-        if self._session_state == "PAUSED":
-            self._session_state = "RUNNING"
+        if not self._started or self._session_state != 'PAUSED':
+            raise RuntimeError('Chỉ Resume một phiên đã Start và đang PAUSED.')
+        self._session_state = 'RUNNING'
 
     def stop(self) -> None:
-        """Dừng hẳn phiên mô phỏng."""
-        self._session_state = "STOPPED"
+        if not self._started or self._session_state not in ('RUNNING', 'PAUSED'):
+            raise RuntimeError('Chỉ Stop một phiên đang chạy hoặc tạm dừng.')
+        self._session_state = 'STOPPED'
 
     def reset(self) -> None:
-        """Tái thiết lập toàn bộ mô phỏng về trạng thái ban đầu."""
         self.__init__(self._config)
 
     def tick(self) -> SimulationSnapshot:
-        """Thực hiện một bước tick 1 giây logic theo đúng hợp đồng R3, R4."""
-        if self._session_state != "RUNNING":
-            raise RuntimeError(f"Chỉ có thể tick khi session ở trạng thái RUNNING (hiện tại: {self._session_state}).")
+        """Tick tự động chỉ chạy khi RUNNING; Step sử dụng run_ticks khi PAUSED."""
+        if self._session_state != 'RUNNING':
+            raise RuntimeError('Chỉ tick khi RUNNING.')
+        return self._advance_tick()
 
-        t_current = float(self._sim_time)
+    def _advance_tick(self) -> SimulationSnapshot:
+        t = self._sim_time
         dt = self._config.motion_2d.dt_s
-        substeps = int(round(1.0 / dt))
-
-        # 1. Sinh xe mới theo Poisson (1 lần mỗi giây cho mỗi hướng N -> S -> E -> W)
         for direction in DIRECTIONS:
-            rate_per_min = self._config.rates_per_min[direction]
-            lam = rate_per_min / 60.0
-            arrivals = poisson_sample(lam, self._rng)
-            for _ in range(arrivals):
-                self._movement.spawn_and_enqueue(direction, arrival_t=t_current)
-                self._total_arrivals += 1
-
-        # 2. Xe di chuyển trong khoảng [t, t+1) với tín hiệu đang áp dụng
-        for step in range(substeps):
-            sub_t = t_current + step * dt
-            self._movement.advance_substep(t=sub_t, dt=dt, controller=self._controller)
-
-        # Cập nhật số xe đã crossing và exited sau chuyển động
-        # Tổng số xe đã crossing = số xe đang active_crossing + số xe đã exited
-        self._crossed_stop_total = len(self._movement.active_crossing) + len(self._movement.exited_vehicles)
-        self._exited_world_total = len(self._movement.exited_vehicles)
-
-        # 3. Cuối khoảng: Engine lấy kết quả occupancy (conflict_clear)
+            count = poisson_sample(self._config.rates_per_min[direction] / 60, self._rng)
+            for _ in range(count):
+                self._movement.spawn_and_enqueue(direction, arrival_t=t)
+            self._stats.record_arrival(direction, count)
+        for step in range(round(1 / dt)):
+            self._movement.advance_substep(t=t + step * dt, dt=dt, controller=self._controller)
+        for vehicle in (*self._movement.active_crossing.values(), *self._movement.exited_vehicles):
+            self._stats.record_departure(vehicle)
         conflict_clear = self._movement.is_conflict_clear()
-
-        # Lưu lại trạng thái đoạn tín hiệu trước tick để kiểm tra chuyển đoạn
-        prev_segment = self._controller.current_segment_code
-
-        # Gọi Controller.tick(conflict_clear=...)
+        previous_segment = self._controller.current_segment_code
         self._controller.tick(conflict_clear=conflict_clear)
-
-        # Cập nhật sim_time = t + 1
         self._sim_time += 1
-
-        # Kiểm tra nếu controller báo ERROR (do clearance timeout)
+        self._stats.capture_tick(self._sim_time, self._metrics_snapshot())
         if self._controller.in_error:
-            self._session_state = "ERROR"
-            return self.snapshot()
-
-        # Kiểm tra chu kỳ hoàn tất an toàn tại ALL_RED_2
-        if self._controller.cycle_complete:
-            # Chu kỳ hiện tại đã xong
+            self._session_state = 'ERROR'
+        elif self._controller.cycle_complete:
+            queues = self._queue_lengths()
+            # Chốt chu kỳ cũ trước khi Controller tính lại lịch từ Queue mới.
+            self._stats.close_cycle(self._sim_time, queues)
             if self._cycle_index >= self._config.cycles_to_run:
-                # Đã đạt giới hạn chu kỳ: hoàn thành phiên mô phỏng
-                self._session_state = "COMPLETED"
+                self._session_state = 'COMPLETED'
             else:
-                # Vẫn còn chu kỳ tiếp theo: chuyển sang cycle_index + 1
-                next_cycle_index = self._cycle_index + 1
-                queue_lengths = {d: self._lanes[d].count() for d in DIRECTIONS}
-                # Khởi động chu kỳ mới trên controller
-                self._controller.start_next_cycle(
-                    queue_lengths,
-                    cycle_no=next_cycle_index,
-                    started_at=self._sim_time,
-                    conflict_clear=conflict_clear,
-                )
-                self._cycle_index = next_cycle_index
-
-        # Cập nhật đồng hồ xanh cho các làn nếu vừa chuyển đoạn
-        if self._controller.current_segment_code != prev_segment:
+                try:
+                    self._activate_cycle(queues, self._cycle_index + 1, conflict_clear=conflict_clear)
+                except (RuntimeError, TypeError, ValueError):
+                    # Controller activation atomic; lỗi giữ terminal ALL_RED của chu kỳ cũ.
+                    self._session_state = 'ERROR'
+        if self._controller.current_segment_code != previous_segment:
             self._update_lane_green_clocks()
-
         return self.snapshot()
 
     def run_ticks(self, n: int) -> SimulationSnapshot:
-        """Chạy liên tiếp n ticks."""
-        if n <= 0:
-            raise ValueError("n phải > 0.")
-        last_snap = self.snapshot()
+        """RUNNING: chạy nhiều tick; PAUSED: Step rồi giữ PAUSED nếu chưa kết thúc."""
+        integer('n', n, 1)
+        if not self._started or self._session_state not in ('RUNNING', 'PAUSED'):
+            raise RuntimeError('run_ticks yêu cầu phiên đã Start ở RUNNING hoặc PAUSED.')
         for _ in range(n):
-            if self._session_state != "RUNNING":
+            if self._session_state not in ('RUNNING', 'PAUSED'):
                 break
-            last_snap = self.tick()
-        return last_snap
+            self._advance_tick()
+        return self.snapshot()
 
-    def snapshot(self) -> SimulationSnapshot:
-        """Tạo SimulationSnapshot chỉ đọc tại trạng thái hiện tại."""
-        geometry_snap = self._geometry.to_snapshot()
-        signal_snap = self._controller.to_signal_snapshot()
-
-        queue_lengths = {d: self._lanes[d].count() for d in DIRECTIONS}
-        active_count = len(self._movement.active_crossing)
-
-        metrics_snap = MetricsSnapshot(
-            queue_lengths=queue_lengths,
-            initial_total=self._initial_total,
-            total_arrivals=self._total_arrivals,
-            crossed_stop_total=self._crossed_stop_total,
-            exited_world_total=self._exited_world_total,
-            active_crossing_count=active_count,
-            clearance_hold_s=float(self._controller.clearance_hold_s),
+    def _metrics_snapshot(self) -> MetricsSnapshot:
+        return MetricsSnapshot(
+            queue_lengths=self._queue_lengths(), initial_total=self._initial_total,
+            total_arrivals=self._stats.arrivals_total,
+            crossed_stop_total=self._stats.crossed_stop_total,
+            exited_world_total=len(self._movement.exited_vehicles),
+            active_crossing_count=len(self._movement.active_crossing),
+            clearance_hold_s=self._controller.clearance_hold_s,
         )
 
-        # Chuyển đổi danh sách xe thành VehicleSnapshot (không chứa xe EXITED)
-        vehicle_snaps: list[VehicleSnapshot] = []
-
-        # Các xe trong Queue (N, S, E, W)
+    def snapshot(self) -> SimulationSnapshot:
+        vehicles = []
         for direction in DIRECTIONS:
-            for v in self._lanes[direction].get_vehicles():
-                x, y = self._geometry.lane_to_xy(v.origin, v.s_front_m)
-                state = "STOPPED" if v.speed_mps == 0 else "APPROACHING"
-                vehicle_snaps.append(
-                    VehicleSnapshot(
-                        vehicle_id=v.vehicle_id,
-                        origin=v.origin,
-                        x=x,
-                        y=y,
-                        speed_mps=v.speed_mps,
-                        motion_state=state,
-                        s_front_m=v.s_front_m,
-                        length_m=v.length_m,
-                    )
-                )
-
-        # Các xe trong active_crossing
-        for v in self._movement.active_crossing:
-            x, y = self._geometry.lane_to_xy(v.origin, v.s_front_m)
-            vehicle_snaps.append(
-                VehicleSnapshot(
-                    vehicle_id=v.vehicle_id,
-                    origin=v.origin,
-                    x=x,
-                    y=y,
-                    speed_mps=v.speed_mps,
-                    motion_state="CROSSING",
-                    s_front_m=v.s_front_m,
-                    length_m=v.length_m,
-                )
-            )
-
+            for vehicle in self._lanes[direction].get_vehicles():
+                vehicles.append(self._vehicle_snapshot(vehicle, 'STOPPED' if vehicle.speed_mps == 0 else 'APPROACHING'))
+        for vehicle in self._movement.active_crossing.values():
+            vehicles.append(self._vehicle_snapshot(vehicle, 'CROSSING'))
         return SimulationSnapshot(
-            sim_time=self._sim_time,
-            cycle_index=self._cycle_index,
-            session_state=self._session_state,
-            geometry=geometry_snap,
-            signals=signal_snap,
-            metrics=metrics_snap,
-            vehicles=tuple(vehicle_snaps),
+            sim_time=self._sim_time, cycle_index=self._cycle_index,
+            session_state=self._session_state, geometry=self._geometry.to_snapshot(),
+            signals=self._controller.to_signal_snapshot(), metrics=self._metrics_snapshot(),
+            vehicles=tuple(vehicles),
+        )
+
+    def _vehicle_snapshot(self, vehicle, state) -> VehicleSnapshot:
+        x, y = self._geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)
+        return VehicleSnapshot(
+            vehicle_id=vehicle.vehicle_id, origin=vehicle.origin, x=x, y=y,
+            speed_mps=vehicle.speed_mps, motion_state=state,
+            s_front_m=vehicle.s_front_m, length_m=vehicle.length_m,
         )

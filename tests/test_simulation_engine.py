@@ -116,7 +116,7 @@ def test_movement_spawn_and_crossing():
     assert v.crossed_stop_t is not None
     assert lanes["N"].count() == 0  # Đã pop khỏi Queue
     assert len(movement.active_crossing) == 1
-    assert movement.active_crossing[0] is v
+    assert movement.active_crossing[v.vehicle_id] is v
     assert movement.is_conflict_clear() is False  # Xe đang trong vùng giao lộ
 
 

@@ -10,12 +10,12 @@ giao diện thông báo và smoke tests.
 Hiện tại đã có Config theo JSON V2, Poisson, Adaptive và đọc/ghi JSON cấu hình.
 Config dùng `rates_per_min`, `motion_2d.enabled` và thời lượng tín hiệu kiểu `int`.
 `data/junctions.json` khởi tạo với `configs: []`; dữ liệu mẫu nằm riêng trong
-`docs/examples/junctions_v2.example.json`. Controller sáu đoạn đã có trên nhánh Algorithm; hai engine và renderer chưa triển khai ở nhánh này.
+`docs/examples/junctions_v2.example.json`. Controller, SimulationEngine, MovementEngine và Statistics đến task 17 đã có trên nhánh này; renderer/UI vẫn là khung.
 
 ## Phạm vi
 
 Một ngã tư bốn hướng **N/S/E/W**, hai pha **NS/EW**, dự kiến mô phỏng xe 2D.
-SimulationEngine dự kiến dùng tick 1 giây; MovementEngine dùng substep 0,2 giây.
+SimulationEngine dùng tick 1 giây; MovementEngine dùng substep 0,2 giây mặc định.
 
 ## Công nghệ
 
@@ -26,8 +26,8 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 
 | Thư mục / file | Vai trò |
 | --- | --- |
-| `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã có; chưa tích hợp engine |
-| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; Controller sáu đoạn đã có; chuyển động, mô phỏng, thống kê còn là khung |
+| `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã được nối với engine |
+| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; Controller, hai engine và thống kê tick/chu kỳ đến 17/10 đã có |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
 | `data/junctions.json` | Cấu hình khởi tạo hợp lệ: schema_version 2, configs rỗng |
@@ -45,7 +45,7 @@ và dependencies, không đóng gói ứng dụng thành thư viện Python.
 - **Queue / collections.deque**: hàng đợi FIFO cho xe đến và rời làn.
 
 Dictionary đã được dùng làm chỉ mục cấu hình trong ConfigManager;
-Lane và SignalPlan đã dùng deque; engine điều phối mô phỏng chưa được triển khai trên nhánh Algorithm.
+Lane và SignalPlan dùng deque; engine điều phối, active_crossing dùng dict theo ID.
 
 ## Thuật toán
 
@@ -74,7 +74,8 @@ uv run python -m py_compile src/app.py
 
 `tests/test_algorithms.py` kiểm tra Poisson và Adaptive; các test Config/Storage
 kiểm tra JSON V2 và việc truyền thời lượng số nguyên vào Adaptive.
-Các test này chưa kiểm chứng hai engine hoặc mô phỏng chuyển động hoàn chỉnh.
+Có thêm test_controller.py và test_simulation_day17.py để kiểm chứng Core đến 17/10.
+UI động và nghiệm thu an toàn task 18 chưa thuộc phạm vi này.
 
 ## Git Flow
 
@@ -113,12 +114,12 @@ uv run streamlit run src/app.py
 | Giai đoạn | Trạng thái / kết quả |
 | --- | --- |
 | 12/10 – Nền tảng V2.3 | Bộ khung, cấu hình mẫu, giao diện hai tab và smoke tests |
-| Models | Config, snapshot, Vehicle, Lane FIFO và SignalPlan đã có; chưa tích hợp engine |
+| Models | Config, snapshot, Vehicle, Lane FIFO và SignalPlan đã tích hợp Core |
 | Thuật toán | Poisson và Adaptive + t_min đã có implementation và kiểm thử |
-| Mô phỏng | Dự kiến: tick 1 giây, chuyển động 2D substep 0,2 giây |
+| Mô phỏng | Đã có tick 1 giây, chuyển động 2D substep 0,2 giây và snapshot |
 | UI hoàn chỉnh | Dự kiến: chỉnh cấu hình và hiển thị xe 2D |
-| Lưu trữ / thống kê | Cấu hình JSON đã có; thống kê CSV chưa triển khai |
-| Tích hợp | Dự kiến: kiểm thử và đánh giá toàn hệ thống |
+| Lưu trữ / thống kê | JSON và thống kê tick/chu kỳ trong RAM đã có; CSV chưa triển khai |
+| Tích hợp | Core đến 17/10 đã có test; UI và an toàn chuyên sâu cần đánh giá tiếp |
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không
 coi các chức năng dự kiến là đã hoạt động.
@@ -183,3 +184,9 @@ Controller sở hữu xây lịch/chuyển sáu đoạn và adapter pha vàng; E
 clock/cycle_index. Xem [hợp đồng Controller](docs/controller_contracts.md).
 `tests/test_controller.py` kiểm tra runtime; phần clearance/min_gap chuyên sâu
 ngày 18 và tích hợp hai engine trên PR #15 được đánh giá riêng.
+
+## Simulation đến hết task 17/10
+
+Xem [hợp đồng runtime](docs/simulation_day17.md) để biết lifecycle, Step/Stop,
+ownership theo ID, thống kê và phạm vi test. App hiện vẫn chỉ có hai tab thông báo;
+kiểm thử Core pass không đồng nghĩa đã có ứng dụng UI hoàn chỉnh.

@@ -241,7 +241,8 @@ cả hai đạt tối thiểu 10. Không dùng công thức phân phối `budget
    Không sinh lại xe ở từng substep chuyển động 0,2 giây.
 3. Khi bắt đầu một chu kỳ (kể cả chu kỳ đầu), lấy snapshot độ dài bốn deque;
    q_ns = len(Q_N) + len(Q_S), q_ew = len(Q_E) + len(Q_W).
-4. Gọi Adaptive và dùng tuple để lập SignalPlan. Giữ nguyên các thời lượng
+4. Engine truyền counts/cycle_no/started_at cho Controller.start_next_cycle.
+   Controller gọi Adaptive và dùng tuple để lập SignalPlan. Giữ nguyên các thời lượng
    trong toàn chu kỳ; chỉ đọc snapshot và phân bổ lại ở chu kỳ tiếp theo.
 5. Thời gian vàng, all-red và clearance hold thuộc controller/movement;
    không cộng vào green_budget. Xe đã vượt vạch thuộc active_crossing và

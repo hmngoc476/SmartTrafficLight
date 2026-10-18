@@ -10,7 +10,7 @@ giao diện thông báo và smoke tests.
 Hiện tại đã có Config theo JSON V2, Poisson, Adaptive và đọc/ghi JSON cấu hình.
 Config dùng `rates_per_min`, `motion_2d.enabled` và thời lượng tín hiệu kiểu `int`.
 `data/junctions.json` khởi tạo với `configs: []`; dữ liệu mẫu nằm riêng trong
-`docs/examples/junctions_v2.example.json`. Hai engine và renderer vẫn chưa triển khai.
+`docs/examples/junctions_v2.example.json`. Controller sáu đoạn đã có trên nhánh Algorithm; hai engine và renderer chưa triển khai ở nhánh này.
 
 ## Phạm vi
 
@@ -27,7 +27,7 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 | Thư mục / file | Vai trò |
 | --- | --- |
 | `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã có; chưa tích hợp engine |
-| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; điều phối, chuyển động, mô phỏng, thống kê còn là khung |
+| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; Controller sáu đoạn đã có; chuyển động, mô phỏng, thống kê còn là khung |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
 | `data/junctions.json` | Cấu hình khởi tạo hợp lệ: schema_version 2, configs rỗng |
@@ -45,7 +45,7 @@ và dependencies, không đóng gói ứng dụng thành thư viện Python.
 - **Queue / collections.deque**: hàng đợi FIFO cho xe đến và rời làn.
 
 Dictionary đã được dùng làm chỉ mục cấu hình trong ConfigManager;
-Queue/deque cho mô phỏng chưa được triển khai.
+Lane và SignalPlan đã dùng deque; engine điều phối mô phỏng chưa được triển khai trên nhánh Algorithm.
 
 ## Thuật toán
 
@@ -83,7 +83,7 @@ Các test này chưa kiểm chứng hai engine hoặc mô phỏng chuyển độ
 | Branch | Phạm vi dự kiến |
 | --- | --- |
 | `feat/models` | Mô hình OOP và cấu trúc dữ liệu |
-| `feat/algorithm` | Poisson, Adaptive và t_min |
+| `feat/algorithm` | Poisson, Adaptive, t_min và TrafficLightController |
 | `feat/simulation` | SimulationEngine và MovementEngine |
 | `feat/ui` | Streamlit và renderer Plotly |
 | `feat/storage` | JSON, CSV và thống kê |
@@ -176,3 +176,10 @@ Khóa danh sách cấu hình chính thức là `configs`. Skeleton `configuratio
 ban đầu đã được đổi an toàn vì chưa chứa dữ liệu người dùng.
 Wireframe là tài liệu thiết kế; CRUD, FileStorage, dashboard và mô phỏng chưa
 được kết nối với ứng dụng Streamlit hiện tại.
+
+## Controller đến hết task 17/10
+
+Controller sở hữu xây lịch/chuyển sáu đoạn và adapter pha vàng; Engine sở hữu
+clock/cycle_index. Xem [hợp đồng Controller](docs/controller_contracts.md).
+`tests/test_controller.py` kiểm tra runtime; phần clearance/min_gap chuyên sâu
+ngày 18 và tích hợp hai engine trên PR #15 được đánh giá riêng.

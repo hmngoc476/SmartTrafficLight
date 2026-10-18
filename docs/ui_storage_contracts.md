@@ -1,5 +1,9 @@
 # Hợp đồng UI và Storage Task 5
 
+Cập nhật runtime đến 17/10: FileStorage/ConfigManager và regression tests đã có;
+xem [Storage implementation](storage_implementation.md). Các trạng thái chuẩn bị bên dưới là
+lịch sử Task 5, không phải kết quả chạy test hiện tại. UI/CSV vẫn là phần riêng.
+
 ## 1. Mục tiêu và phạm vi
 
 Mốc kế hoạch **12/10/2026**, thực hiện **13/10/2026**. Chốt wireframe desktop

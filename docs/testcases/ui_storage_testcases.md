@@ -1,5 +1,9 @@
 # Test cases UI và Storage Task 5
 
+Cập nhật runtime đến 17/10: FileStorage/ConfigManager và regression tests đã có;
+xem [Storage implementation](../storage_implementation.md). Các trạng thái chuẩn bị bên dưới là
+lịch sử Task 5, không phải kết quả chạy test hiện tại. UI/CSV vẫn là phần riêng.
+
 Các test **schema/fixture** có thể chạy ngay. Test ConfigManager/FileStorage,
 widget hoặc Engine ghi **CHƯA THỰC THI**, cần implementation thật. Kỳ vọng trong
 bảng không phải kết quả chạy thực tế; PASS/FAIL/SKIP được báo cáo riêng từ pytest.

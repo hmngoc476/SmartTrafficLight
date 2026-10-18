@@ -1,8 +1,10 @@
+"""CRUD JSON V2; khóa toàn bộ giao dịch, chỉ đổi cache sau ghi thành công."""
+
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import Any
-import copy
 
 from src.core.storage import FileStorage, json_path
 from src.models.config import Config
@@ -10,165 +12,91 @@ from src.models.config import Config
 
 class ConfigManager:
     def __init__(self, filepath: str | Path = json_path):
-        self.filepath = Path(filepath)
+        self.filepath = Path(filepath).resolve()
         self._config_map: dict[str, dict[str, Any]] = {}
         self._reload_cache()
 
-    # [P1.1. Bắt lỗi ID trùng / thiếu khi khởi tạo cache (_reload_cache)]
+    def _read_map(self):
+        # FileStorage validates every Config and rejects duplicate IDs.
+        return {config['id']: config for config in FileStorage.load_configs(self.filepath)}
+
     def _reload_cache(self) -> None:
-        """Read JSON file, validate strictly each config and build an in-memory Hash Map index"""
-        configs = FileStorage.load_configs(self.filepath)
-        temp_map: dict[str, dict[str, Any]] = {}
+        with FileStorage.transaction(self.filepath):
+            self._config_map = self._read_map()
 
-        for cfg in configs:
-            if not isinstance(cfg, dict):
-                raise TypeError("Mỗi cấu hình trong JSON phải là một dictionary.")
-
-            # [P0.2: Validate dữ liệu bằng Config.from_dict() từ Models]
-            Config.from_dict(cfg)
-
-            cfg_id = cfg.get("id")
-            if not cfg_id or not isinstance(cfg_id, str):
-                raise ValueError("Cấu hình bị thiếu trường 'id' hoặc 'id' không hợp lệ.")
-
-            if cfg_id in temp_map:
-                raise ValueError(f"Phát hiện ID trùng lặp trong file JSON: '{cfg_id}'")
-
-            temp_map[cfg_id] = cfg
-
-        self._config_map = temp_map
-
-    # [P0.2. Sử dụng Config.from_dict() để thống nhất validation]
-    # [P0.3. Khóa ID cấu hình không đổi khi Update]
-    def validate(
-            self,
-            data: dict[str, Any],
-            is_update: bool = False,
-            config_id: str | None = None,
-    ) -> tuple[bool, str]:
-        """Validate cấu hình sử dụng Config.from_dict() làm chuẩn Models."""
-        if not isinstance(data, dict):
-            return False, "Dữ liệu cấu hình phải là một object (dict)."
-
-        # [P0.3. Khóa ID cấu hình không đổi khi Update]
-        if is_update and config_id is not None:
-            if config_id not in self._config_map:
-                return False, f"Không tìm thấy cấu hình với ID '{config_id}'."
-            new_id = data.get("id")
-            if new_id != config_id:
-                return (
-                    False,
-                    f"Không được thay đổi ID khi cập nhật (ID gốc: '{config_id}', ID mới: '{new_id}').",
-                )
-
-        # [P0.2. Sử dụng Config.from_dict() để thống nhất validation]
-        # - Không xây dựng lại toàn bộ quy tắc validation trong Manager
-        # - Không tự chuyển string/float/bool thành integer
-        # - Không tự điền hướng N/S/E/W còn thiếu
-        # - Kiểm tra đầy đủ motion_2d ngay cả khi enabled=False
+    @staticmethod
+    def _validate(data, configs, is_update=False, config_id=None):
         try:
             Config.from_dict(data)
-        except (ValueError, TypeError) as e:
-            return False, str(e)
+        except (TypeError, ValueError) as error:
+            return False, str(error)
+        if is_update:
+            if config_id not in configs:
+                return False, f"Không tìm thấy cấu hình với ID '{config_id}'."
+            if data['id'] != config_id:
+                return False, 'Không được thay đổi ID khi cập nhật.'
+        elif data['id'] in configs:
+            return False, f"ID '{data['id']}' đã tồn tại."
+        return True, 'Cấu hình hợp lệ.'
 
-        cfg_id = data["id"]
+    def validate(self, data, is_update=False, config_id=None) -> tuple[bool, str]:
+        with FileStorage.transaction(self.filepath):
+            return self._validate(data, self._config_map, is_update, config_id)
 
-        # Kiểm tra ID trùng khi tạo mới
-        if not is_update:
-            if cfg_id in self._config_map:
-                return False, f"ID '{cfg_id}' đã tồn tại. Vui lòng chọn ID khác."
+    valid_config = validate
 
-        return True, "Cấu hình hợp lệ."
-
-    # [P2.2. Chuẩn hóa Public API ConfigManager và Aliases]
-    def valid_config(
-            self,
-            data: dict[str, Any],
-            is_update: bool = False,
-            config_id: str | None = None,
-    ) -> tuple[bool, str]:
-        return self.validate(data, is_update=is_update, config_id=config_id)
-
-    # [P1.3. Ngăn thay đổi HashMap ngoài CRUD]
     def list(self) -> list[dict[str, Any]]:
-        """Get list of all configs (returns deep copy)."""
-        return copy.deepcopy(list(self._config_map.values()))
+        """Bản sao cache; gọi reload() để cập nhật thay đổi từ Manager khác."""
+        with FileStorage.transaction(self.filepath):
+            return copy.deepcopy(list(self._config_map.values()))
 
-    # [P2.2. Chuẩn hóa Public API ConfigManager và Aliases]
-    def list_configs(self) -> list[dict[str, Any]]:
-        return self.list()
+    list_configs = list
 
-    # [P1.3. Ngăn thay đổi HashMap ngoài CRUD]
     def get(self, config_id: str) -> dict[str, Any] | None:
-        """Get config by ID (returns deep copy)."""
-        cfg = self._config_map.get(config_id)
-        return copy.deepcopy(cfg) if cfg is not None else None
+        with FileStorage.transaction(self.filepath):
+            return copy.deepcopy(self._config_map.get(config_id))
 
-    # [P2.2. Chuẩn hóa Public API ConfigManager và Aliases]
-    def get_config(self, config_id: str) -> dict[str, Any] | None:
-        return self.get(config_id)
+    get_config = get
 
-    # [P0.4. Đồng bộ HashMap và Atomic Persistence]
-    def create(self, data: dict[str, Any]) -> tuple[bool, str]:
-        """Create new config"""
-        is_valid, msg = self.valid_config(data, is_update=False)
-        if not is_valid:
-            return False, msg
+    def reload(self) -> None:
+        """Nạp lại cache có kiểm soát; file sai không làm mất cache hiện tại."""
+        self._reload_cache()
 
-        cfg_id = data["id"]
+    def _mutate(self, operation, config_id=None, data=None):
+        # Đọc lại trong cùng khóa để các Manager khác nhau không ghi đè dữ liệu cũ.
+        with FileStorage.transaction(self.filepath):
+            try:
+                current = self._read_map()
+                if operation == 'delete':
+                    if config_id not in current:
+                        return False, f"Không tìm thấy cấu hình với ID '{config_id}'."
+                else:
+                    data = copy.deepcopy(data)
+                    valid, message = self._validate(data, current, operation == 'update', config_id)
+                    if not valid:
+                        return False, message
+                    config_id = data['id']
+                candidate = copy.deepcopy(current)
+                if operation == 'delete':
+                    del candidate[config_id]
+                else:
+                    candidate[config_id] = data
+                FileStorage.save_configs(list(candidate.values()), self.filepath)
+            except Exception as error:
+                return False, f'Chưa lưu được cấu hình, giữ nguyên cache: {error}'
+            self._config_map = candidate
+            return True, f"Thao tác {operation} cấu hình '{config_id}' thành công."
 
-        # 1. Tạo candidate HashMap
-        candidate_map = copy.deepcopy(self._config_map)
-        candidate_map[cfg_id] = copy.deepcopy(data)
+    def create(self, data) -> tuple[bool, str]:
+        return self._mutate('create', data=data)
 
-        # 2. FileStorage.save_configs() thành công mới cập nhật RAM
-        try:
-            FileStorage.save_configs(list(candidate_map.values()), self.filepath)
-        except Exception as e:
-            return False, f"Lưu cấu hình thất bại, giữ nguyên dữ liệu RAM: {e}"
+    def update(self, config_id, new_data) -> tuple[bool, str]:
+        return self._mutate('update', config_id, new_data)
 
-        # 3. Save thành công -> Thay cache chính
-        self._config_map = candidate_map
-        return True, f"Tạo cấu hình '{cfg_id}' thành công!"
+    def delete(self, config_id) -> tuple[bool, str]:
+        return self._mutate('delete', config_id)
 
-    # [P0.3. Khóa ID cấu hình không đổi khi Update]
-    # [P0.4. Đồng bộ HashMap và Atomic Persistence]
-    def update(self, config_id: str, new_data: dict[str, Any]) -> tuple[bool, str]:
-        """Update an existing config"""
-        is_valid, msg = self.valid_config(new_data, is_update=True, config_id=config_id)
-        if not is_valid:
-            return False, msg
-
-        # 1. Tạo candidate HashMap
-        candidate_map = copy.deepcopy(self._config_map)
-        candidate_map[config_id] = copy.deepcopy(new_data)
-
-        # 2. FileStorage.save_configs() thành công mới cập nhật RAM
-        try:
-            FileStorage.save_configs(list(candidate_map.values()), self.filepath)
-        except Exception as e:
-            return False, f"Cập nhật cấu hình thất bại, giữ nguyên dữ liệu RAM: {e}"
-
-        # 3. Save thành công -> Thay cache chính
-        self._config_map = candidate_map
-        return True, f"Cập nhật cấu hình '{config_id}' thành công!"
-
-    # [P0.4. Đồng bộ HashMap và Atomic Persistence]
-    def delete(self, config_id: str) -> tuple[bool, str]:
-        """Delete a config"""
-        if config_id not in self._config_map:
-            return False, f"Không tìm thấy cấu hình với ID '{config_id}'."
-
-        # 1. Tạo candidate HashMap
-        candidate_map = copy.deepcopy(self._config_map)
-        del candidate_map[config_id]
-
-        # 2. FileStorage.save_configs() thành công mới cập nhật RAM
-        try:
-            FileStorage.save_configs(list(candidate_map.values()), self.filepath)
-        except Exception as e:
-            return False, f"Xoá cấu hình thất bại, giữ nguyên dữ liệu RAM: {e}"
-
-        # 3. Save thành công -> Thay cache chính
-        self._config_map = candidate_map
-        return True, f"Đã xóa cấu hình '{config_id}' thành công!"
+    # Public API cũ trên main vẫn hoạt động cho các caller chưa chuyển tên.
+    create_config = create
+    update_config = update
+    delete_config = delete

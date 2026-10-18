@@ -1,124 +1,99 @@
+"""JSON V2: validate đầy đủ, file tạm riêng và ghi nguyên tử trong một process."""
+
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import tempfile
+from threading import Lock, RLock
 
-json_path = Path("data/junctions.json")
+from src.models.config import Config
 
-# [P0.1. Hoàn thiện FileStorage.load_configs() - Kiểm tra trùng lặp khóa JSON]
+json_path = Path('data/junctions.json')
+_locks_guard = Lock()
+_path_locks: dict[Path, RLock] = {}
+
+
 def dupes_check(pairs):
-    out_dict = {}
-    for key, val in pairs:
-        if key in out_dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
             raise ValueError(f"Phát hiện khóa JSON trùng lặp: '{key}'")
-        out_dict[key] = val
-    return out_dict
+        result[key] = value
+    return result
 
-# [P0.1. Hoàn thiện FileStorage.load_configs() - Từ chối giá trị số không hợp lệ (NaN/Infinity)]
-def num_check(val):
-    raise ValueError(f"Từ chối giá trị số không hợp lệ: {val}")
+
+def num_check(value):
+    raise ValueError(f'Từ chối giá trị số không hợp lệ: {value}')
+
 
 class FileStorage:
-    # [P0.1. Hoàn thiện FileStorage.load_configs()]
+    @staticmethod
+    @contextmanager
+    def transaction(filepath=json_path):
+        """Tuần tự hóa read/candidate/write/cache cùng đường dẫn giữa các thread.
+
+        RLock cho phép Manager giữ khóa giao dịch rồi gọi load/save. Đây là
+        đồng bộ trong process Streamlit; không phải khóa liên process.
+        """
+        path = Path(filepath).resolve()
+        with _locks_guard:
+            lock = _path_locks.setdefault(path, RLock())
+        with lock:
+            yield
+
+    @staticmethod
+    def _validated_configs(configs):
+        if not isinstance(configs, list):
+            raise TypeError('Dữ liệu configs phải là một mảng (list).')
+        validated = []
+        seen = set()
+        for payload in configs:
+            config = Config.from_dict(payload)
+            if config.id in seen:
+                raise ValueError(f"Phát hiện ID trùng lặp: '{config.id}'")
+            seen.add(config.id)
+            validated.append(config.to_dict())
+        return validated
+
     @staticmethod
     def load_configs(filepath=json_path):
-        """Read config list from JSON, creating an empty V2 file if missing."""
-        filepath = Path(filepath)
+        """Thiếu file tạo root rỗng; dữ liệu sai luôn bị từ chối và giữ nguyên."""
+        path = Path(filepath)
+        with FileStorage.transaction(path):
+            if not path.exists():
+                FileStorage.save_configs([], path)
+                return []
+            try:
+                with path.open(encoding='utf-8') as stream:
+                    data = json.load(stream, object_pairs_hook=dupes_check, parse_constant=num_check)
+            except json.JSONDecodeError as error:
+                raise ValueError(f'File JSON sai cú pháp, giữ nguyên nội dung file: {error}') from error
+            if not isinstance(data, dict) or set(data) != {'schema_version', 'configs'}:
+                raise ValueError('Root phải có đúng schema_version và configs; legacy cần migration có kiểm soát.')
+            if type(data['schema_version']) is not int or data['schema_version'] != 2:
+                raise ValueError('Phiên bản JSON chưa được hỗ trợ; yêu cầu schema_version=2.')
+            return FileStorage._validated_configs(data['configs'])
 
-        # [YÊU CẦU: Khởi tạo file skeleton JSON V2 nếu file chưa tồn tại]
-        if not filepath.exists():
-            filepath.parent.mkdir(parents=True, exist_ok=True)
-            empty_data = {"schema_version": 2, "configs": []}
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(empty_data, f, ensure_ascii=False, indent=2)
-            return []
-
-        # [YÊU CẦU: Đọc strict JSON parsing, giữ nguyên nội dung file nếu sai cú pháp]
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(
-                    f,
-                    object_pairs_hook= dupes_check,
-                    parse_constant= num_check
-                )
-        except json.JSONDecodeError as e:
-            raise ValueError(f"File JSON sai cú pháp, giữ nguyên nội dung file: {e}")
-
-        # [YÊU CẦU: Kiểm tra JSON root là object (dict)]
-        if not isinstance(data, dict):
-            raise ValueError("Root của JSON phải là một object (dictionary).")
-
-        # [YÊU CẦU: Không chấp nhận trường ngoài JSON Schema & Không tự chuyển đổi legacy (V1)]
-        allowed_keys = {"schema_version", "configs"}
-        actual_keys = set(data.keys())
-        if actual_keys != allowed_keys:
-            raise ValueError("Không chấp nhận trường ngoài JSON Schema hoặc dữ liệu legacy. Cần migration thủ công.")
-
-        # [YÊU CẦU: Bắt buộc có schema_version và đúng phiên bản 2]
-        if data.get("schema_version") != 2:
-            raise ValueError("Bắt buộc có schema_version và đúng phiên bản 2.")
-
-        # [YÊU CẦU: Bắt buộc có configs kiểu list]
-        configs = data.get("configs")
-        if not isinstance(configs, list):
-            raise ValueError("Trường 'configs' bắt buộc phải là kiểu list.")
-
-        # [YÊU CẦU: Validate từng cấu hình và kiểm tra ID trùng/rỗng trước khi chấp nhận dữ liệu]
-        seen_ids = set()
-        for cfg in configs:
-            if not isinstance(cfg, dict):
-                raise ValueError("Mỗi cấu hình bên trong 'configs' phải là một object.")
-            cfg_id = cfg.get("id")
-            if not cfg_id or not isinstance(cfg_id, str) or not cfg_id.strip():
-                raise ValueError("Có cấu hình bị thiếu trường 'id' hoặc 'id' không hợp lệ.")
-            if cfg_id in seen_ids:
-                raise ValueError(f"Phát hiện ID trùng lặp trước khi chấp nhận dữ liệu: '{cfg_id}'")
-            seen_ids.add(cfg_id)
-
-        return configs
-
-    # [P1.2. Hoàn thiện FileStorage.save_configs()]
     @staticmethod
     def save_configs(configs, filepath=json_path):
-        """Save configs in to JSON safely (via temp file)."""
-        filepath = Path(filepath)
-
-        # [YÊU CẦU: Validate toàn bộ payload trước khi ghi]
-        if not isinstance(configs, list):
-            raise TypeError("Dữ liệu configs phải là một mảng (list).")
-        seen_ids = set()
-        for cfg in configs:
-            if not isinstance(cfg, dict):
-                raise TypeError("Mỗi cấu hình trong configs phải là một object (dict).")
-            cfg_id = cfg.get("id")
-            if not cfg_id or not isinstance(cfg_id, str) or not cfg_id.strip():
-                raise ValueError("Có cấu hình bị thiếu 'id' hoặc 'id' không phải chuỗi hợp lệ.")
-            if cfg_id in seen_ids:
-                raise ValueError(f"Phát hiện ID trùng lặp trước khi lưu: '{cfg_id}'")
-            seen_ids.add(cfg_id)
-
-        # [YÊU CẦU: Tạo file tạm duy nhất trong cùng thư mục đích]
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = filepath.with_name(filepath.name + ".tmp")
-
-        payload = {
-            "schema_version": 2,
-            "configs": configs
-        }
-
-        try:
-        # [YÊU CẦU: Ghi UTF-8 và Dùng json.dump(..., allow_nan=False)]
-            with open(temp_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, indent=2, allow_nan=False)
-
-                # [YÊU CẦU: Flush và os.fsync() trước khi replace]
-                f.flush()
-                os.fsync(f.fileno())
-
-            # [YÊU CẦU: Đóng file tạm trước khi os.replace()]
-            os.replace(temp_path, filepath)
-
-        except Exception as e:
-            # [YÊU CẦU: Dọn file tạm nếu ghi thất bại & Không làm mất file gốc]
-            if temp_path.exists():
-                temp_path.unlink()
-            raise RuntimeError(f"Ghi file JSON thất bại, giữ nguyên file gốc: {e}")
+        """Validate trước khi mở file; chỉ replace sau khi flush/fsync thành công."""
+        payload = {'schema_version': 2, 'configs': FileStorage._validated_configs(configs)}
+        path = Path(filepath)
+        with FileStorage.transaction(path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode='w', encoding='utf-8', dir=path.parent,
+                    prefix=f'.{path.name}.', suffix='.tmp', delete=False,
+                ) as stream:
+                    temporary = Path(stream.name)
+                    json.dump(payload, stream, ensure_ascii=False, indent=2, allow_nan=False)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, path)
+            except Exception as error:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+                raise RuntimeError(f'Ghi file JSON thất bại, giữ nguyên file gốc: {error}') from error

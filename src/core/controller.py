@@ -1,4 +1,3 @@
-"""TODO: Coordinate NS/EW phases using SignalPlan."""
 """Six-segment adaptive traffic-light controller theo hợp đồng V2.3.
 
 Chức năng:

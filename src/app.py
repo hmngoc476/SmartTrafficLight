@@ -1,27 +1,44 @@
-"""Streamlit skeleton; chỉ hiển thị giao diện, không chứa nghiệp vụ."""
+"""Điểm vào Streamlit: chỉ ghép hai tab, không chứa thuật toán hay xử lý nghiệp vụ.
 
-import streamlit as st
-import pandas as pd
+Chạy từ thư mục gốc dự án:  uv run streamlit run src/app.py
+"""
+import sys
+from pathlib import Path
 
-from src.core.storage import FileStorage
-from src.core.manager import ConfigManager
-from src.models.config import Config, Motion2DConfig
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:   # để import được "src.*" khi Streamlit chạy file này
+    sys.path.insert(0, str(ROOT))
 
-from src.ui.tab1_config import render_tab1
-from src.ui.tab2_sim import render_tab2
-#Config the Streamlit page
+import streamlit as st  # noqa: E402
+
 st.set_page_config(page_title="Smart Traffic Light Simulator", layout="wide")
-st.title("Smart Traffic Light Simulator")
 
-#Initialize ConfigManager
-manager = ConfigManager()
+from src.ui.config_tab import render_config_tab  # noqa: E402
+from src.ui.labels import T  # noqa: E402
+from src.ui.simulation_tab import render_simulation_tab  # noqa: E402
+from src.ui.state import init_session  # noqa: E402
+from src.ui.theme import inject_css  # noqa: E402
 
-#Create 2 tabs
-configuration_tab, simulation_tab = st.tabs(["Quản lý cấu hình", "Mô phỏng 2D"])
+inject_css()
+init_session()
 
-#========================================================================================
-#TAB 1: CRUD
+HEADER_HTML = f"""
+<div class="header-container">
+    <div>
+        <div class="app-title">Smart Traffic Light Simulator</div>
+        <div class="app-sub">{T["header_sub"]}</div>
+    </div>
+    <div>
+        <span class="badge">{T["badge"]}</span>
+    </div>
+</div>
+"""
+st.markdown(HEADER_HTML, unsafe_allow_html=True)
+
+configuration_tab, simulation_tab = st.tabs(["Quản lý cấu hình", "Mô phỏng và phân tích"])
 with configuration_tab:
-    st.info("Chức năng quản lý cấu hình đang phát triển.")
+    render_config_tab()
 with simulation_tab:
-    st.info("Chức năng mô phỏng xe 2D đang phát triển.")
+    render_simulation_tab()
+
+st.html('<svg width="100" height="40"><rect width="100" height="40" fill="red"/></svg>')

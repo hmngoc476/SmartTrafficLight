@@ -1,212 +1,132 @@
+"""Renderer 2D Plotly: chỉ vẽ SimulationSnapshot, không sửa Queue hoặc Vehicle.
+
+Bố cục lấy từ wireframe (8 px/mét, tâm giao lộ cố định):
+- cửa sổ hiển thị ±23,25 m quanh tâm (phần xe ngoài cửa sổ vẫn thuộc Core);
+- +x là Đông, +y là Nam (trục y đảo ngược khi vẽ);
+- x, y trong snapshot là đầu xe; biểu tượng xe chỉ để minh họa nên bề rộng
+  vẽ cố định, không thay cho bề rộng vật lý dùng kiểm tra xung đột.
+"""
+from __future__ import annotations
+
 import plotly.graph_objects as go
 
-class TrafficRenderer2D:
+from src.core.geometry import DIRECTION_VECTORS
+from src.models.snapshot import SimulationSnapshot
 
-    # Color Codes for 2D Map Background Details
-    color_bg = "#ffffff"  # Background -> While
-    color_center_box = "#f6f7f8"  # The center square (where 4 direction meet) -> White gray
-    color_road = "#e1e5e8"  # Road way -> Light gray
-    color_lane_line = "#9da7ae"  # Road markings / Dashed line -> Gray
-    color_stop_line = "#263238"  # Stop line -> Super dark green (nearly black)
+PX_PER_M = 8.0
+VIEW_HALF_M = 23.25
+FIG_WIDTH_PX, FIG_HEIGHT_PX = 660, 395
+X_RANGE = (-51.5, 31.0)      # phần trống bên trái để tâm giao lộ nằm đúng vị trí wireframe
+Y_RANGE = (25.25, -24.125)   # đảo ngược: +y hướng Nam (xuống dưới)
+VISUAL_VEHICLE_WIDTH_M = 1.625
 
-
-    # Color Codes for Signal Light
-    color_signal_red = "#aa4a4a"
-    color_signal_green = "#40805b"
-    color_signal_yellow = "#f1c40f"
-
-
-    # Color Codes for Vehicle Details
-    vehicle_colors = {
-        "APPROACHING": {"fill": "#d9e3eb", "border": "#838b90", "name": "APPROACHING"},
-        "STOPPED": {"fill": "#6d7982", "border": "#49555d", "name": "STOPPED"},
-        "CROSSING": {"fill": "#91b5ad", "border": "#5c7473", "name": "CROSSING"}
-    }
-    # Light blue: "#d9e3eb"
-    # Dark gray blue: "#838b90"
-    # Dark gray: "#6d7982"
-    # Super dark gray: "#49555d"
-    # "#91b5ad"  # Light green: "#91b5ad"
-    # Dark green: "#5c7473"
-
-    def __init__(self, visible_range_m: float = 60.0, intersection_width_m: float = 16.0):
-        self.visible_range_m = visible_range_m
-        self.intersection_width_m = intersection_width_m
-        self.half_width = intersection_width_m / 2.0
-        self.r_corner = 0.6  # r: Corner rounding radius (meters)
-
-    # Create Vehicle Shape
-    @staticmethod
-    def create_rounded_rect_path(x0: float, y0: float, x1: float, y1: float, r: float) -> str:
-        """ Generate an SVG path string representing a rounded rectangle. """
-        # Ensure xmin < xmax and ymin < ymax
-        xmin, xmax = min(x0, x1), max(x0, x1)
-        ymin, ymax = min(y0, y1), max(y0, y1)
-
-        # Clamp radius to prevent it from exceeding half of the width or height
-        r = min(r, (xmax - xmin) / 2.0, (ymax - ymin) / 2.0)
-
-        # SVG commands used below: M = Move, L = Line (edges), Q = Curve (corners), Z = Close path
-        # Build the path clockwise: Alternate between straight lines (L) and corner curves (Q)
-        return (
-            f"M {xmin + r},{ymin} "
-            f"L {xmax - r},{ymin} Q {xmax},{ymin} {xmax},{ymin + r} "
-            f"L {xmax},{ymax - r} Q {xmax},{ymax} {xmax - r},{ymax} "
-            f"L {xmin + r},{ymax} Q {xmin},{ymax} {xmin},{ymax - r} "
-            f"L {xmin},{ymin + r} Q {xmin},{ymin} {xmin + r},{ymin} Z"
-        )
-
-    def _draw_infrastructure(self, fig: go.Figure):
-        """ Render the complete intersection infrastructure (roadways, lane markings, and stop lines). """
-        # y-axis (North - South)
-        fig.add_shape(
-            type="rect",
-            x0=-self.half_width, y0=-self.visible_range_m,
-            x1=self.half_width, y1=self.visible_range_m,
-            fillcolor=self.color_road, line=dict(width=0), layer="below"
-        )
-        # x-axis (East - West)
-        fig.add_shape(
-            type="rect",
-            x0=-self.visible_range_m, y0=-self.half_width,
-            x1=self.visible_range_m, y1=self.half_width,
-            fillcolor=self.color_road, line=dict(width=0), layer="below"
-        )
-        # The center square
-        fig.add_shape(
-            type="rect",
-            x0=-self.half_width, y0=-self.half_width,
-            x1=self.half_width, y1=self.half_width,
-            fillcolor=self.color_center_box,
-            line=dict(color=self.color_lane_line, width=1, dash="dash"),
-            layer="below"
-        )
-        # Road markings
-        fig.add_shape(type="line", x0=0, y0=-self.visible_range_m, x1=0, y1=-self.half_width,
-                      line=dict(color=self.color_lane_line, width=1.5, dash="dash"))
-        fig.add_shape(type="line", x0=0, y0=self.half_width, x1=0, y1=self.visible_range_m,
-                      line=dict(color=self.color_lane_line, width=1.5, dash="dash"))
-        fig.add_shape(type="line", x0=-self.visible_range_m, y0=0, x1=-self.half_width, y1=0,
-                      line=dict(color=self.color_lane_line, width=1.5, dash="dash"))
-        fig.add_shape(type="line", x0=self.half_width, y0=0, x1=self.visible_range_m, y1=0,
-                      line=dict(color=self.color_lane_line, width=1.5, dash="dash"))
-
-        # Stop line
-        fig.add_shape(type="line", x0=-self.half_width, y0=-self.half_width, x1=0, y1=-self.half_width,
-                      line=dict(color=self.color_stop_line, width=3.5))
-        fig.add_shape(type="line", x0=0, y0=self.half_width, x1=self.half_width, y1=self.half_width,
-                      line=dict(color=self.color_stop_line, width=3.5))
-        fig.add_shape(type="line", x0=-self.half_width, y0=0, x1=-self.half_width, y1=self.half_width,
-                      line=dict(color=self.color_stop_line, width=3.5))
-        fig.add_shape(type="line", x0=self.half_width, y0=-self.half_width, x1=self.half_width, y1=0,
-                      line=dict(color=self.color_stop_line, width=3.5))
-
-    def _draw_signals(self, fig: go.Figure, snapshot):
-        """ Draw signal lights at the intersection corners """
-        current_phase = getattr(snapshot, "phase", "NS_GREEN")
-        ns_color = self.color_signal_green if "NS_GREEN" in current_phase else (
-            self.color_signal_yellow if "NS_YELLOW" in current_phase else self.color_signal_red)
-        ew_color = self.color_signal_green if "EW_GREEN" in current_phase else (
-            self.color_signal_yellow if "EW_YELLOW" in current_phase else self.color_signal_red)
-
-        sig_size = 1.5
-        hw = self.half_width
-
-        # NS Signals
-        fig.add_shape(type="circle", x0=-sig_size, y0=-hw - sig_size, x1=0, y1=-hw, fillcolor=ns_color, line_width=1)
-        fig.add_shape(type="circle", x0=0, y0=hw, x1=sig_size, y1=hw + sig_size, fillcolor=ns_color, line_width=1)
-        # EW Signals
-        fig.add_shape(type="circle", x0=hw, y0=-sig_size, x1=hw + sig_size, y1=0, fillcolor=ew_color, line_width=1)
-        fig.add_shape(type="circle", x0=-hw - sig_size, y0=0, x1=-hw, y1=sig_size, fillcolor=ew_color, line_width=1)
+ROAD, CORE, DASH = "#E1E5E8", "#F6F7F8", "#9DA7AE"
+INK = "#263238"
+SIGNAL_COLORS = {"GREEN": "#40805B", "RED": "#AA4A4A", "YELLOW": "#C9A23F", "IDLE": "#B5BFC6"}
+# (nền, viền) theo trạng thái xe; trùng chú giải.
+VEHICLE_STYLE = {
+    "APPROACHING": ("#D9E3EB", "#808B92"),
+    "STOPPED": ("#6D7982", "#49555D"),
+    "CROSSING": ("#91B5AD", "#5B7372"),
+}
 
 
-    def _draw_vehicles_optimized(self, fig: go.Figure, snapshot):
-        """
-        Render vehicles: Group all vehicles with the same state into a single SVG string.
-        Reduce the Plotly Draw call cost from O(N) to O(1).
-        """
-        if not snapshot or not hasattr(snapshot, "vehicles"):
-            return
+def _rect(x0: float, y0: float, x1: float, y1: float, fill: str,
+          line: str | None = None, dash: bool = False, width: float = 1.3) -> dict:
+    return dict(
+        type="rect", x0=x0, y0=y0, x1=x1, y1=y1, layer="below",
+        fillcolor=fill,
+        line=dict(color=line or fill, width=width if line else 0,
+                  dash="6px,5px" if dash else "solid"),
+    )
 
-        # SVG paths and Scatter data accumulators
-        svg_paths = {"APPROACHING": "", "STOPPED": "", "CROSSING": ""}
-        scatter_data = {
-            "APPROACHING": {"x": [], "y": [], "id": []},
-            "STOPPED": {"x": [], "y": [], "id": []},
-            "CROSSING": {"x": [], "y": [], "id": []}
-        }
 
-        # 1. PROCESS VEHICLES O(N): Calculate bounds and accumulate SVG paths
+def _vehicle_shape(x0: float, y0: float, x1: float, y1: float, clipped: bool,
+                   fill: str, stroke: str) -> dict:
+    """Hình chữ nhật bo góc; bản bị cắt viền cửa sổ giữ góc vuông."""
+    common = dict(fillcolor=fill, line=dict(color=stroke, width=1.3), layer="above")
+    if clipped:
+        return dict(type="rect", x0=x0, y0=y0, x1=x1, y1=y1, **common)
+    r = 0.35
+    path = (f"M {x0 + r},{y0} L {x1 - r},{y0} Q {x1},{y0} {x1},{y0 + r} "
+            f"L {x1},{y1 - r} Q {x1},{y1} {x1 - r},{y1} L {x0 + r},{y1} "
+            f"Q {x0},{y1} {x0},{y1 - r} L {x0},{y0 + r} Q {x0},{y0} {x0 + r},{y0} Z")
+    return dict(type="path", path=path, **common)
+
+
+def build_map_figure(snapshot: SimulationSnapshot | None, show_vehicles: bool = True) -> go.Figure:
+    """Dựng figure bản đồ từ snapshot; snapshot None vẽ giao lộ trống (chưa có phiên)."""
+    half = snapshot.geometry.intersection_width_m / 2 if snapshot else 8.0
+    lane = snapshot.geometry.lane_offset_m if snapshot else 2.0
+    view = VIEW_HALF_M
+    shapes: list[dict] = [
+        # bốn nhánh đường + lõi giao lộ
+        _rect(-half, -view, half, -half, ROAD), _rect(-half, half, half, view, ROAD),
+        _rect(-view, -half, -half, half, ROAD), _rect(half, -half, view, half, ROAD),
+        _rect(-half, -half, half, half, CORE, DASH, dash=True),
+    ]
+    for x0, y0, x1, y1 in ((0, -view, 0, view), (-view, 0, view, 0)):   # trục giữa
+        shapes.append(dict(type="line", x0=x0, y0=y0, x1=x1, y1=y1, layer="below",
+                           line=dict(color=DASH, width=1.3, dash="6px,5px")))
+    t = 0.25  # nửa bề dày vạch dừng
+    for x0, y0, x1, y1 in (
+        (-2 * lane, -half - t, 0, -half + t),    # N
+        (0, half - t, 2 * lane, half + t),       # S
+        (-half - t, 0, -half + t, 2 * lane),     # W
+        (half - t, -2 * lane, half + t, 0),      # E
+    ):
+        shapes.append(_rect(x0, y0, x1, y1, INK))
+
+    dot_x: list[float] = []
+    dot_y: list[float] = []
+    if show_vehicles and snapshot:
+        w = VISUAL_VEHICLE_WIDTH_M / 2
         for v in snapshot.vehicles:
-            x, y = getattr(v, "x", 0.0), getattr(v, "y", 0.0)
-            origin = getattr(v, "origin", "N")
-            state = getattr(v, "motion_state", "APPROACHING")
-            safe_state = state if state in svg_paths else "APPROACHING"
-
-            # Get vehicle length from user-configured properties, width is fixed
-            v_len = getattr(v, "length_m", 4.5)
-            v_width = 2.0
-
-            # Calculate bounding box based on direction
-            if origin in ("N", "S"):
-                x0, x1 = x - v_width / 2.0, x + v_width / 2.0
-                y0, y1 = y - v_len / 2.0, y + v_len / 2.0
+            dx, dy = DIRECTION_VECTORS[v.origin]
+            rear_x, rear_y = v.x - v.length_m * dx, v.y - v.length_m * dy
+            if v.origin in ("N", "S"):
+                x0, x1 = v.x - w, v.x + w
+                y0, y1 = min(v.y, rear_y), max(v.y, rear_y)
             else:
-                x0, x1 = x - v_len / 2.0, x + v_len / 2.0
-                y0, y1 = y - v_width / 2.0, y + v_width / 2.0
+                x0, x1 = min(v.x, rear_x), max(v.x, rear_x)
+                y0, y1 = v.y - w, v.y + w
+            cx0, cx1, cy0, cy1 = max(x0, -view), min(x1, view), max(y0, -view), min(y1, view)
+            if cx0 >= cx1 or cy0 >= cy1:
+                continue   # nằm ngoài cửa sổ, vẫn thuộc Core
+            clipped = (cx0, cx1, cy0, cy1) != (x0, x1, y0, y1)
+            fill, stroke = VEHICLE_STYLE[v.motion_state]
+            shapes.append(_vehicle_shape(cx0, cy0, cx1, cy1, clipped, fill, stroke))
+            px, py = v.x - 0.3 * dx, v.y - 0.3 * dy   # chấm nhỏ đánh dấu đầu xe
+            if abs(px) <= view and abs(py) <= view:
+                dot_x.append(px)
+                dot_y.append(py)
 
-                # Accumulate SVG path
-                svg_paths[safe_state] += self.create_rounded_rect_path(x0, y0, x1, y1, self.r_corner) + " "
+    colors = snapshot.signals.signal_colors if snapshot else dict.fromkeys("NSEW", "IDLE")
+    side = lane + 3.25  # đèn lệch tâm đường 5,25 m (chỉ để minh họa)
+    lamp_pos = {"N": (-side, -half - lane), "S": (side, half + lane),
+                "W": (-half - lane, side), "E": (half + lane, -side)}
+    fig = go.Figure()
+    if dot_x:
+        fig.add_trace(go.Scatter(x=dot_x, y=dot_y, mode="markers", hoverinfo="skip",
+                                 marker=dict(size=4, color=INK)))
+    fig.add_trace(go.Scatter(
+        x=[lamp_pos[d][0] for d in "NSEW"], y=[lamp_pos[d][1] for d in "NSEW"],
+        mode="markers", hoverinfo="skip",
+        marker=dict(size=12, color=[SIGNAL_COLORS[colors[d]] for d in "NSEW"])))
 
-                # Save data for text labels
-                scatter_data[safe_state]["x"].append(x)
-                scatter_data[safe_state]["y"].append(y)
-                scatter_data[safe_state]["id"].append(getattr(v, "vehicle_id", "V"))
-
-        # 2. DRAW TO PLOTLY O(1)
-        for state, color_info in self.vehicle_colors.items():
-            # Add grouped shapes
-            if svg_paths[state]:
-                fig.add_shape(
-                    type="path", path=svg_paths[state],
-                    fillcolor=color_info["fill"], line=dict(color=color_info["border"], width=1.5),
-                    layer="above"
-                )
-                # Dummy trace for Legend
-                fig.add_trace(go.Scatter(
-                    x=[None], y=[None], mode="markers", name=color_info["name"],
-                    marker=dict(size=12, symbol="square", color=color_info["fill"],
-                                line=dict(width=1.5, color=color_info["border"]))
-                ))
-
-                # Add text IDs
-                if scatter_data[state]["x"]:
-                    fig.add_trace(go.Scatter(
-                        x=scatter_data[state]["x"], y=scatter_data[state]["y"],
-                        mode="text", text=scatter_data[state]["id"],
-                        textfont=dict(size=9, color="#1e293b"), showlegend=False, hoverinfo="none"
-                    ))
-
-    def render(self, snapshot) -> go.Figure:
-        """ Entry point to render the 2D figure. """
-        fig = go.Figure()
-        self._draw_infrastructure(fig)
-        self._draw_signals(fig, snapshot)
-        self._draw_vehicles_optimized(fig, snapshot)
-
-        # Apply strict 1:1 scale layout
-        fig.update_layout(
-            template="plotly_white", paper_bgcolor=self.color_bg, plot_bgcolor=self.color_bg,
-            title="Bản đồ 2D · x dương Đông, y dương Nam · đơn vị mét",
-            xaxis=dict(range=[-self.visible_range_m, self.visible_range_m], showgrid=False, zeroline=False,
-                       visible=False),
-            yaxis=dict(range=[-self.visible_range_m, self.visible_range_m], showgrid=False, zeroline=False,
-                       visible=False, scaleanchor="x", scaleratio=1),
-            margin=dict(l=10, r=10, t=40, b=10),
-            legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="right", x=0.98)
-        )
-        return fig
-
-# Wrapper function for app.py
-def render_traffic_2d(snapshot, visible_range_m: float = 60.0, intersection_width_m: float = 16.0) -> go.Figure:
-    return TrafficRenderer2D(visible_range_m, intersection_width_m).render(snapshot)
+    label_font = dict(size=17, color=INK, family="Segoe UI, Inter, system-ui, sans-serif")
+    fig.update_layout(
+        shapes=shapes, showlegend=False,
+        width=FIG_WIDTH_PX, height=FIG_HEIGHT_PX, margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(range=list(X_RANGE), visible=False, fixedrange=True,
+                   scaleanchor="y", scaleratio=1, constrain="domain"),
+        yaxis=dict(range=list(Y_RANGE), visible=False, fixedrange=True, constrain="domain"),
+        annotations=[
+            dict(x=0, y=-view + 1.0, text="<b>N ↓</b>", showarrow=False, font=label_font),
+            dict(x=0, y=view, text="<b>S ↑</b>", showarrow=False, font=label_font),
+            dict(x=-28.75, y=0, text="<b>W →</b>", showarrow=False, font=label_font),
+            dict(x=28.4, y=0, text="<b>← E</b>", showarrow=False, font=label_font),
+        ],
+    )
+    return fig

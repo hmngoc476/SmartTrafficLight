@@ -37,7 +37,7 @@ flowchart LR
     E --> S[SimulationSnapshot và báo cáo chỉ đọc]
     S --> R[Renderer2D và dashboard]
     R --> T2
-    E --> Q[SimulationSummary / CycleMetric]
+    E --> Q[Summary dict / CycleMetrics]
     Q --> F
     F --> V[CSV lịch sử và chu kỳ]
 ```
@@ -118,7 +118,7 @@ phiên đã dừng, làm sạch selected_config_id/draft và yêu cầu chọn l
 | Reset | PAUSED/STOPPED/COMPLETED/ERROR, có bản chốt | Xác nhận bỏ tiến độ; tạo lại theo cùng bản chốt/seed |
 | Step +1s | PAUSED và has_started | engine.run_ticks(1), một Poisson/tick và năm substep |
 | Chạy hết chu kỳ | PAUSED và has_started | Gọi public API tới ranh giới chu kỳ thực tế, kể cả hold |
-| Xuất CSV | Có Summary/CycleMetric đã chốt | Core/Storage xuất; UI chỉ nhận nội dung tải xuống |
+| Xuất CSV | Có Summary/CycleMetrics đã chốt | Core/Storage xuất; UI chỉ nhận nội dung tải xuống |
 
 PAUSED đã Start dùng Resume. Sau Reset, PAUSED chưa Start thì bật Start, khóa
 Resume/Step/Chạy chu kỳ. Reset khi RUNNING disabled, yêu cầu Pause/Stop.
@@ -163,8 +163,8 @@ hoặc đổi API thống kê để khớp lời gọi cũ.
 | Xe/tín hiệu/timer/counters | Task 4 SimulationSnapshot |
 | Queue NS/EW, green hiện tại/trước | Báo cáo chỉ đọc từ Core/SignalPlan |
 | Queue theo thời gian | QueueSeries chụp cuối tick, x=sim_time, y=tổng xe chưa crossing |
-| Green theo chu kỳ | CycleMetric, x=cycle_index, series NS/EW; lịch chốt đầu chu kỳ |
-| Arrivals/Departures | CycleMetric, departed nghĩa là vượt vạch; dữ liệu chu kỳ chưa chốt ghi nhãn tạm |
+| Green theo chu kỳ | CycleMetrics, x=cycle_index, series NS/EW; lịch chốt đầu chu kỳ |
+| Arrivals/Departures | CycleMetrics, departed nghĩa là vượt vạch; dữ liệu chu kỳ chưa chốt ghi nhãn tạm |
 | Conflict count / gap thực đo | Core geometry/movement report, không lấy active_count làm conflict_count |
 | Cuối phiên / CSV | SimulationSummary và nội dung xuất từ Storage |
 
@@ -310,7 +310,7 @@ ID không tồn tại hoặc file load lỗi thì Start disabled, thông báo c�
 | --- | --- | --- |
 | data/junctions.json | Chỉ configs schema v2 | Sau CRUD hợp lệ qua Manager/Storage |
 | data/sim_history.csv | Một Summary mỗi run_id | Stop hoặc Completed, đúng một lần |
-| data/cycle_metrics.csv | CycleMetric, nếu dùng | Sau chu kỳ hoặc chốt cuối phiên |
+| data/cycle_metrics.csv | CycleMetrics, nếu dùng | Sau chu kỳ hoặc chốt cuối phiên |
 
 Không lưu vehicles/snapshot/series/metrics vào junctions.json. JSON snapshot
 ở docs của Task 4 chỉ là fixture thiết kế, không thuộc dữ liệu cấu hình runtime.
@@ -369,7 +369,7 @@ Dashboard render không gọi tick. Không dùng vòng while vô hạn ở UI.
 ## 16. Test cases và kiểm tra đã thực hiện
 
 [Danh sách test cases](testcases/ui_storage_testcases.md) phân biệt validation
-schema/dữ liệu mẫu với CRUD/Storage/UI/Engine còn chưa hiện thực.
+schema/dữ liệu mẫu với các luồng CRUD/Storage/UI/Engine.
 tests/test_ui_storage_contracts.py kiểm tra schema, fixture, file ảnh và các
 bất biến của mẫu. jsonschema có sẵn trong môi trường; không thêm dependency.
 Test dùng optional fixture validator, nếu công cụ không có thì báo SKIP rõ ràng,
@@ -383,17 +383,15 @@ git diff --check
 git status
 ```
 
-Workspace có clone lồng SmartTrafficLight/SmartTrafficLight gây pytest import
-mismatch; giữ nguyên và dùng `uv run pytest --ignore=SmartTrafficLight` ở project
-chính. Checkout sạch dùng pytest thông thường. Không tính các test CRUD/engine
-chưa viết là PASS; kết quả chạy thật được báo cáo khi bàn giao.
+Runtime hiện tại dùng pytest thông thường: `test_ui_runtime.py` chạy AppTest
+hai tab với Core/Storage thật; `test_reporting_api.py` kiểm tra API báo cáo;
+`test_history_storage.py` kiểm tra canonical CSV, lỗi ghi, retry và đồng thời.
+Kết quả nghiệm thu cuối xem [ui_core_integration.md](ui_core_integration.md).
 
 ## 17. Việc thực hiện sau ngày thiết kế
 
-Hiện thực Config/ConfigManager, FileStorage JSON/CSV, validation nghiệp vụ,
-migration có backup và controls Tab 1. Sau review/merge các PR phụ thuộc mới
-kết nối Engine/Snapshot, DashboardData, renderer/controls/charts/CSV vào Tab 2.
-Xác nhận các đề xuất về ID allocator, Reset/khóa xóa phiên, dt tolerance, báo cáo
-dashboard và bề rộng xe thiếu trong V2.3. Không tự thêm lane_offset_m/vehicle_width_m
-vào JSON chính thức; nếu cần mở rộng thì thống nhất version/schema trong PR riêng.
+ConfigManager/FileStorage JSON và hai tab đã tích hợp với Core ngày 18–19.
+Width vật lý 1.8m, Reset, dashboard và schema CSV đã được thống nhất ở tài liệu
+tích hợp. Không tự thêm lane_offset_m/vehicle_width_m vào JSON chính thức.
+File legacy/header không khớp cần migration có kiểm soát; không tự ghi đè.
 Wireframe chỉ đóng vai trò thiết kế, không được dùng làm màn hình giả mô phỏng thật.

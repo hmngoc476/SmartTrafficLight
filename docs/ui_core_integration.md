@@ -45,3 +45,37 @@ Hai file CSV dùng header V2.3 tại ui_storage_contracts.md §14. UI bổ sung
 run_id, started_at_iso (ISO có timezone), chỉ đưa phiên STOPPED/COMPLETED
 và chu kỳ đã chốt vào lịch sử. ERROR giữ báo cáo chẩn đoán, không tự ghi vào
 schema lịch sử vốn chỉ cho phép STOPPED/COMPLETED.
+
+## Lịch sử và phục hồi ghi lỗi
+
+HistoryStorage validate Summary/chu kỳ/metadata trước khi ghi. Null average khi
+chưa có mẫu xuất thành ô trống. Kiểm tra cả hai header và khóa duy nhất trước
+khi sửa file; cùng run_id nhưng nội dung khác bị từ chối, không bỏ qua âm thầm.
+
+Mỗi file ghi qua file tạm riêng cùng thư mục, flush/fsync rồi os.replace.
+Hai file không phải một lần ghi nguyên tử chung: nếu cycles thành công nhưng
+history lỗi, retry đọc cả hai và bổ sung phần thiếu theo run_id/(run_id,cycle_index).
+Trường hợp history đã có nhưng cycles thiếu cũng được hoàn thiện; retry đủ dữ
+liệu trả False và không thêm dòng. Khóa đường dẫn theo thứ tự cố định dùng chung
+FileStorage.transaction để tuần tự hóa các session trong một process Streamlit;
+đây không phải khóa giữa nhiều process.
+
+UI giữ các báo cáo chưa lưu trong history_outbox của session_state, kể cả khi
+Start/Reset một phiên khác. Chỉ đánh dấu saved khi cả hai file đủ dữ liệu.
+Lần ghi lỗi không tự retry liên tục ở rerun; nút “Thử lại ghi lịch sử” thử lại
+outbox với cùng metadata. Outbox thuộc phiên trình duyệt, không phải journal
+khôi phục sau khi server hoặc phiên trình duyệt bị mất.
+
+## Kiểm thử nghiệm thu
+
+Giữ toàn bộ 609 test nền. Kiểm thử mới bao gồm API báo cáo bất biến, chu kỳ
+tạm/đã chốt, ranh giới có hold/ERROR, hai tab, CRUD, Reset replay, widget rerun,
+timer trùng/cũ, outbox qua phiên mới, CSV header/null/validation, replace thất bại,
+phục hồi hai file và nhiều session ghi đồng thời. Các test dùng dữ liệu tạm.
+
+Chạy `uv run --frozen pytest -q -ra`. Kiểm tra Chromium bổ sung dùng timer thật,
+Pause/Step/Reset/Start, hai tab và tải CSV; không có lỗi JavaScript.
+
+Lần chạy bàn giao ngày 19/10/2026: **651 passed**, 0 failure/error/skip.
+60 cặp Adaptive/Fixed-Time, H=180s, đều đủ H; JSON kết quả giống Core b13c53a.
+Chi tiết phạm vi tại [ui_core_integration_results.md](ui_core_integration_results.md).

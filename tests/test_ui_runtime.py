@@ -184,3 +184,42 @@ if 'test_event' in st.session_state:
     timer_app.run()
     assert engine.sim_time == 2
     assert not timer_app.exception
+
+
+def test_history_failure_retains_outbox_across_new_run_and_retry(app, monkeypatch):
+    at = app
+    create_config(at,cycles=1)
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    run_id = at.session_state['run_id']
+    original = history_storage._write_atomic
+    attempts = []
+    def fail_history(path,header,rows):
+        if path == history_storage.HISTORY_PATH:
+            attempts.append(path)
+            raise OSError('Injected history write failure')
+        return original(path,header,rows)
+    with monkeypatch.context() as patch:
+        patch.setattr(history_storage,'_write_atomic',fail_history)
+        at.button(key='sim_cycle').click().run()
+        assert not at.session_state['summary_saved']
+        assert run_id in at.session_state['history_outbox']
+        assert history_storage.CYCLES_PATH.exists()
+        assert not history_storage.HISTORY_PATH.exists()
+        at.run()
+        assert len(attempts) == 1
+        at.button(key='sim_start').click().run()
+        assert at.session_state['run_id'] != run_id
+        assert run_id in at.session_state['history_outbox']
+    at.button(key='sim_history_retry').click().run()
+    assert not at.session_state['history_outbox']
+    assert run_id in at.session_state['history_saved_ids']
+    assert not at.session_state['summary_saved']  # The new RUNNING session is not saved.
+    at.button(key='sim_stop').click().run()
+    assert at.session_state['summary_saved']
+    import csv
+    with history_storage.HISTORY_PATH.open() as f:
+        assert len(list(csv.DictReader(f))) == 2
+    with history_storage.CYCLES_PATH.open() as f:
+        assert len(list(csv.DictReader(f))) == 1
+    assert not at.exception

@@ -41,6 +41,16 @@ class MovementEngine:
     def min_gap_violations(self) -> int:
         return self._min_gap_violations
 
+    @property
+    def observed_min_gap_m(self) -> float | None:
+        """Smallest current same-lane gap; None when there is no pair to measure."""
+        gaps = []
+        for direction in DIRECTIONS:
+            cars = self._cars(direction)
+            gaps.extend(a.s_front_m - a.length_m - b.s_front_m
+                        for a, b in zip(cars, cars[1:]))
+        return min(gaps) if gaps else None
+
     def _cars(self, direction):
         active = sorted((v for v in self._active_crossing.values() if v.origin == direction),
                         key=lambda v: v.s_front_m, reverse=True)

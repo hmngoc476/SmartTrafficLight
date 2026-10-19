@@ -22,3 +22,6 @@ wheels/
 *~
 .coverage
 htmlcov/
+.idea/
+data/sim_history.csv
+data/cycle_metrics.csv

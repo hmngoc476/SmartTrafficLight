@@ -8,6 +8,7 @@ from src.core.controller import TrafficLightController
 from src.core.geometry import Geometry
 from src.core.movement import MovementEngine
 from src.core.statistics import SimulationStats
+from src.core.reporting import DashboardData
 from src.models.config import Config, integer
 from src.models.lane import Lane
 from src.models.vehicle import STOPPED_SPEED_MPS
@@ -67,6 +68,10 @@ class SimulationEngine:
     @property
     def session_state(self) -> SessionState:
         return self._session_state
+
+    @property
+    def has_started(self) -> bool:
+        return self._started
 
     @property
     def controller(self) -> TrafficLightController:
@@ -177,7 +182,8 @@ class SimulationEngine:
                 try:
                     self._activate_cycle(queues, self._cycle_index + 1, conflict_clear=conflict_clear)
                 except (RuntimeError, TypeError, ValueError) as error:
-                    # Controller activation atomic; lỗi giữ terminal ALL_RED của chu kỳ cũ.
+                    # Reporting may fail after Controller activation: retain the original error.
+                    self._controller.fail_safe()
                     self._session_state = 'ERROR'
                     self._error_message = str(error)
         if (self._session_state != 'ERROR' and self._horizon_s is not None
@@ -197,6 +203,31 @@ class SimulationEngine:
                 break
             self._advance_tick()
         return self.snapshot()
+
+    def run_until_cycle_end(self) -> SimulationSnapshot:
+        """Step a started PAUSED session to the real boundary, hold or ERROR included."""
+        if not self._started or self._session_state != 'PAUSED':
+            raise RuntimeError('Chạy hết chu kỳ yêu cầu phiên đã Start và đang PAUSED.')
+        closed = len(self._stats.cycles)
+        while self._session_state == 'PAUSED' and len(self._stats.cycles) == closed:
+            self._advance_tick()
+        return self.snapshot()
+
+    def cycle_metrics(self):
+        return self._stats.cycle_metrics(self._sim_time, self._queue_lengths())
+
+    def dashboard_data(self) -> DashboardData:
+        return DashboardData(
+            snapshot=self.snapshot(), current_green=self._stats.current_green,
+            previous_green=self._stats.previous_green,
+            queue_series=tuple((tick.sim_time, sum(tick.metrics.queue_lengths.values()))
+                               for tick in self._stats.ticks),
+            cycle_metrics=self.cycle_metrics(),
+            conflict_occupancy_count=self._movement.conflict_occupancy_count,
+            min_gap_config_m=self._config.motion_2d.min_gap_m,
+            observed_min_gap_m=self._movement.observed_min_gap_m,
+            summary=self.summary() if self._session_state in ('STOPPED', 'COMPLETED', 'ERROR') else None,
+        )
 
     def summary(self) -> dict:
         return dict(self._stats.summary(), policy=self._policy, config_id=self._config.id,

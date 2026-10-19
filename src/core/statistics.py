@@ -25,10 +25,19 @@ class CycleMetrics:
 
     avg_queue_cycle: float = 0.0
     clearance_hold_s: float = 0.0
+    provisional: bool = False
 
     @property
     def actual_cycle_s(self) -> int:
         return self.ended_at_s - self.started_at_s
+
+    @property
+    def arrivals(self) -> int:
+        return self.arrivals_ns + self.arrivals_ew
+
+    @property
+    def departures(self) -> int:
+        return self.departed_ns + self.departed_ew
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +83,38 @@ class SimulationStats:
     @property
     def cycles(self) -> tuple[CycleMetrics, ...]:
         return tuple(self._cycles)
+
+    @property
+    def current_green(self) -> tuple[int, int]:
+        if self._open_cycle is not None:
+            return self._open_cycle['green_ns_s'], self._open_cycle['green_ew_s']
+        last = self._cycles[-1]
+        return last.green_ns_s, last.green_ew_s
+
+    @property
+    def previous_green(self) -> tuple[int, int] | None:
+        index = -1 if self._open_cycle is not None else -2
+        if len(self._cycles) < abs(index):
+            return None
+        previous = self._cycles[index]
+        return previous.green_ns_s, previous.green_ew_s
+
+    def cycle_metrics(self, sim_time: int, queues) -> tuple[CycleMetrics, ...]:
+        """Closed records plus a detached, explicitly provisional current cycle."""
+        if self._open_cycle is None:
+            return self.cycles
+        opened = self._open_cycle
+        values = {key: value for key, value in opened.items()
+                  if key not in ('arrivals', 'departures', 'queue_sum', 'tick_count')}
+        for axis, origins in [('ns', 'NS'), ('ew', 'EW')]:
+            values['arrivals_' + axis] = sum(self._arrivals[d] - opened['arrivals'][d] for d in origins)
+            values['departed_' + axis] = sum(self._departures[d] - opened['departures'][d] for d in origins)
+            values['q_' + axis + '_end'] = sum(queues[d] for d in origins)
+        current = CycleMetrics(**values, ended_at_s=sim_time, provisional=True,
+                               avg_queue_cycle=opened['queue_sum'] / opened['tick_count']
+                               if opened['tick_count'] else 0.0,
+                               clearance_hold_s=self._current_hold)
+        return (*self._cycles, current)
 
     def record_arrival(self, origin: str, count: int = 1) -> None:
         direction(origin)

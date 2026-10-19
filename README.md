@@ -10,7 +10,9 @@ giao diện thông báo và smoke tests.
 Hiện tại đã có Config theo JSON V2, Poisson, Adaptive và đọc/ghi JSON cấu hình.
 Config dùng `rates_per_min`, `motion_2d.enabled` và thời lượng tín hiệu kiểu `int`.
 `data/junctions.json` khởi tạo với `configs: []`; dữ liệu mẫu nằm riêng trong
-`docs/examples/junctions_v2.example.json`. Core Algorithms/Simulation đến task 18–19 đã có: hình bao xe 1,8m, clearance, invariants, thống kê và đối chứng Fixed-Time. Renderer/UI vẫn là khung.
+`docs/examples/junctions_v2.example.json`. Core Algorithms/Simulation đến task 18–19
+đã có hình bao xe 1,8m, clearance, invariants, thống kê và đối chứng Fixed-Time.
+UI hai tab đã nối Core/Storage thật, renderer và CSV lịch sử.
 
 ## Phạm vi
 
@@ -28,8 +30,8 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 | --- | --- |
 | `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã được nối với engine |
 | `src/core/` | Poisson/Adaptive/Fixed-Time, Controller, hình học/Movement, replay arrivals, thống kê và đối chứng; quản lý cấu hình JSON |
-| `src/ui/` | Khung renderer 2D |
-| `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
+| `src/ui/` | CRUD, điều khiển phiên, timer, dashboard/charts và renderer 2D chỉ đọc |
+| `src/app.py` | Điểm vào Streamlit với hai tab Quản lý cấu hình và Mô phỏng và phân tích |
 | `data/junctions.json` | Cấu hình khởi tạo hợp lệ: schema_version 2, configs rỗng |
 | `tests/` | Smoke tests, thuật toán, hình học/snapshot, Config, JSON và tích hợp Storage → Config → Adaptive |
 
@@ -62,8 +64,9 @@ uv sync
 uv run streamlit run src/app.py
 ```
 
-Ứng dụng hiện chỉ có tab **Quản lý cấu hình** và **Mô phỏng 2D**, kèm thông báo
-đang phát triển. Dừng server bằng Ctrl+C.
+Tab **Quản lý cấu hình** tạo/sửa/xóa và chọn cấu hình đã lưu. Tab **Mô phỏng và
+phân tích** chạy Core, Pause/Resume/Step/chạy hết chu kỳ, Reset cùng seed và
+xuất báo cáo CSV. Reset cần Start lại. Dừng server bằng Ctrl+C.
 
 ## Kiểm thử
 
@@ -179,8 +182,9 @@ các trường JSON V2, gồm `rates_per_min`, `motion_2d` và `motion_2d.enable
 [test cases](docs/testcases/ui_storage_testcases.md).
 Khóa danh sách cấu hình chính thức là `configs`. Skeleton `configurations: []`
 ban đầu đã được đổi an toàn vì chưa chứa dữ liệu người dùng.
-Wireframe là tài liệu thiết kế; CRUD, FileStorage, dashboard và mô phỏng chưa
-được kết nối với ứng dụng Streamlit hiện tại.
+Ứng dụng hiện có CRUD qua FileStorage JSON và dashboard/mô phỏng dùng Core thật.
+Wireframe là tài liệu thiết kế; xem [hợp đồng tích hợp UI](docs/ui_core_integration.md)
+để biết lifecycle, timer và CSV đã hiện thực.
 
 ## Controller đến hết task 17/10
 
@@ -192,8 +196,8 @@ ngày 18 và tích hợp hai engine trên PR #15 được đánh giá riêng.
 ## Simulation đến hết task 17/10
 
 Xem [hợp đồng runtime](docs/simulation_day17.md) để biết lifecycle, Step/Stop,
-ownership theo ID, thống kê và phạm vi test. App hiện vẫn chỉ có hai tab thông báo;
-kiểm thử Core pass không đồng nghĩa đã có ứng dụng UI hoàn chỉnh.
+ownership theo ID, thống kê và phạm vi test. Các test UI thực nằm trong
+`tests/test_ui_runtime.py`; chúng chạy hai tab trên Core/Storage thật.
 
 
 ## Core ngày 18–19 và thí nghiệm không cần UI
@@ -219,5 +223,5 @@ uv run pytest
 ```
 
 Output là báo cáo thí nghiệm, không phải sim_history.csv/cycle_metrics.csv của UI.
-Không mặc định Adaptive tốt hơn ở mọi kịch bản. Giao diện Streamlit chưa được
-nối với những API Core mới trong đợt này.
+Không mặc định Adaptive tốt hơn ở mọi kịch bản. UI đã nối với API báo cáo mới;
+thí nghiệm đối chứng nhiều seed vẫn là CLI độc lập, chưa có màn so sánh policy trong UI.

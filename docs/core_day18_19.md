@@ -170,8 +170,8 @@ schema CSV lịch sử của UI.
   xe initial thay xe mới để không mâu thuẫn TC-23; vị trí/timestamp kỳ vọng vẫn giữ.
 
 Các test và thí nghiệm chỉ nghiệm thu mô hình học thuật, không xác nhận hệ
-thống điều khiển giao thông thực. UI, DashboardData/SimulationSummary của
-nhánh UI và CSV lịch sử còn là phần tích hợp riêng, không gắn nhãn đã hoàn thành
-chỉ vì Core ngày 18–19 đã có.
+thống điều khiển giao thông thực. Phần UI/CSV được nghiệm thu riêng trong
+[hợp đồng tích hợp UI](ui_core_integration.md); không suy ra UI pass chỉ từ
+kết quả test Core. Engine.summary() vẫn là dict, DashboardData chỉ đọc.
 
 Kết quả lần chạy bàn giao: [core_day18_19_results.md](core_day18_19_results.md).

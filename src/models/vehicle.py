@@ -3,6 +3,8 @@ from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from src.models.config import direction, number, text
 
+STOPPED_SPEED_MPS = 0.1
+
 
 class MotionState(StrEnum):
     APPROACHING = 'APPROACHING'
@@ -34,7 +36,7 @@ class Vehicle:
         number('length_m', self.length_m, positive=True)
         if self.s_front_m > 0:
             raise ValueError('Xe mới phải ở trước hoặc tại vạch; Core ghi nhận crossing sau.')
-        if self.speed_mps == 0:
+        if self.speed_mps <= STOPPED_SPEED_MPS + 1e-9:
             object.__setattr__(self, 'motion_state', MotionState.STOPPED)
 
     @property
@@ -51,7 +53,7 @@ class Vehicle:
         if s_front_m < self.s_front_m:
             raise ValueError('Vị trí xe không được di chuyển lùi.')
         state = (MotionState.CROSSING if self.crossed_stop_t is not None else
-                 MotionState.STOPPED if speed_mps == 0 else MotionState.APPROACHING)
+                 MotionState.STOPPED if speed_mps <= STOPPED_SPEED_MPS + 1e-9 else MotionState.APPROACHING)
         object.__setattr__(self, 's_front_m', s_front_m)
         object.__setattr__(self, 'speed_mps', speed_mps)
         object.__setattr__(self, 'motion_state', state)
@@ -82,7 +84,7 @@ class Vehicle:
     def add_stopped_delay(self, dt_s: float) -> None:
         """Core cộng khoảng đứng yên trước vạch, không tự chạy đồng hồ."""
         number('dt_s', dt_s, low=0)
-        if self.crossed_stop_t is not None or self.speed_mps != 0:
+        if self.crossed_stop_t is not None or self.speed_mps > STOPPED_SPEED_MPS + 1e-9:
             raise ValueError('Chỉ cộng delay khi xe đứng yên và chưa crossing.')
         total = self.stopped_delay_s + dt_s
         number('stopped_delay_s', total, low=0)

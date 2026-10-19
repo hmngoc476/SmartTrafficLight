@@ -1,4 +1,7 @@
-# Simulation — tích hợp đến hết task 17/10
+# Simulation — bàn giao lịch sử đến hết task 17/10
+
+Cập nhật: Core ngày 18–19 đã hoàn thiện tiếp trên nền này; xem
+[core_day18_19.md](core_day18_19.md) cho API/kiểm thử hiện tại. Phần dưới mô tả mốc 17.
 
 Hai engine và thống kê Core đã có trên feat/simulation. Controller lấy cùng
 commit với feat/algorithm/PR #9. UI/renderer không được chỉnh trong đợt này.

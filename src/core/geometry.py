@@ -9,6 +9,7 @@ from math import isfinite
 from types import MappingProxyType
 
 from src.models.snapshot import DIRECTIONS, Direction, GeometrySnapshot
+from src.models.config import PHYSICAL_VEHICLE_WIDTH_M, Motion2DConfig
 
 DIRECTION_VECTORS = MappingProxyType({
     "N": (0.0, 1.0),
@@ -22,10 +23,8 @@ DIRECTION_VECTORS = MappingProxyType({
 class Geometry:
     """Tham số hình học bằng mét, bất biến và không tham chiếu Lane/Vehicle.
 
-    vehicle_width_m=None: V2.3 chưa chốt bề rộng xe. Hình bao và kiểm tra
-    occupancy chưa được hiện thực; xem phương án trong simulation_contracts.md.
-    min_gap_m và stop_margin_m chỉ được cung cấp cho engine tương lai;
-    lane_to_xy không dùng chúng để tự sửa vị trí đầu xe.
+    Geometry() giữ metadata lịch sử width=None; Core dùng for_motion() để
+    truyền rõ bề rộng vật lý 1.8m đã chốt. lane_to_xy không tự clamp vị trí.
     """
 
     intersection_width_m: float = 16.0
@@ -54,6 +53,51 @@ class Geometry:
             object.__setattr__(self, name, float(value))
         if self.lane_offset_m >= self.intersection_width_m / 2:
             raise ValueError("lane_offset_m phải nhỏ hơn nửa bề rộng giao lộ.")
+        if self.vehicle_width_m is not None:
+            half_car = self.vehicle_width_m / 2
+            if (self.lane_offset_m < half_car
+                    or self.lane_offset_m + half_car > self.intersection_width_m / 2 + 1e-9):
+                raise ValueError('Hai làn phải chứa đủ bề rộng vật lý của xe.')
+
+    @classmethod
+    def for_motion(cls, motion: Motion2DConfig) -> 'Geometry':
+        """Tâm làn thích nghi với bề rộng đường; 16m vẫn dùng offset 2m."""
+        return cls(intersection_width_m=motion.intersection_width_m,
+                   approach_visible_m=motion.approach_visible_m,
+                   vehicle_length_m=motion.vehicle_length_m, min_gap_m=motion.min_gap_m,
+                   stop_margin_m=motion.stop_margin_m,
+                   lane_offset_m=min(2.0, motion.intersection_width_m / 4),
+                   vehicle_width_m=PHYSICAL_VEHICLE_WIDTH_M)
+
+    @property
+    def world_bounds(self) -> tuple[float, float, float, float]:
+        edge = self.intersection_width_m / 2 + self.approach_visible_m
+        return (-edge, -edge, edge, edge)
+
+    def vehicle_bounds(self, origin: str, s_front_m: float, length_m: float) -> tuple[float, float, float, float]:
+        """AABB đầy đủ của thân xe, không chỉ vị trí đầu xe."""
+        if self.vehicle_width_m is None:
+            raise ValueError('Thiếu bề rộng vật lý; không thể kiểm tra occupancy.')
+        if isinstance(length_m, bool) or not isinstance(length_m, (int, float)):
+            raise TypeError('length_m phải là số.')
+        if not isfinite(length_m) or length_m <= 0:
+            raise ValueError('length_m phải dương và hữu hạn.')
+        x, y = self.lane_to_xy(origin, s_front_m)
+        dx, dy = DIRECTION_VECTORS[origin]
+        rear_x, rear_y = x - length_m * dx, y - length_m * dy
+        half = self.vehicle_width_m / 2
+        return (min(x, rear_x) - abs(dy) * half, min(y, rear_y) - abs(dx) * half,
+                max(x, rear_x) + abs(dy) * half, max(y, rear_y) + abs(dx) * half)
+
+    def occupies_conflict(self, origin: str, s_front_m: float, length_m: float) -> bool:
+        x0, y0, x1, y1 = self.vehicle_bounds(origin, s_front_m, length_m)
+        a, b, c, d = self.conflict_bounds
+        return x0 <= c and x1 >= a and y0 <= d and y1 >= b
+
+    def outside_world(self, origin: str, s_front_m: float, length_m: float) -> bool:
+        x0, y0, x1, y1 = self.vehicle_bounds(origin, s_front_m, length_m)
+        a, b, c, d = self.world_bounds
+        return {'N': y0 > d, 'S': y1 < b, 'E': x1 < a, 'W': x0 > c}[origin]
 
     @property
     def conflict_bounds(self) -> tuple[float, float, float, float]:

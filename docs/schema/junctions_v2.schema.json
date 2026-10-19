@@ -47,7 +47,7 @@
         "max_speed_mps": {"$ref": "#/$defs/positive_number"},
         "accel_mps2": {"$ref": "#/$defs/positive_number"},
         "approach_visible_m": {"$ref": "#/$defs/positive_number"},
-        "intersection_width_m": {"$ref": "#/$defs/positive_number"},
+        "intersection_width_m": {"type": "number", "minimum": 3.6, "description": "Hai làn chứa xe vật lý 1.8m; giả định Core đã chốt ngày 19/10/2026."},
         "stop_margin_m": {"$ref": "#/$defs/nonnegative_number"},
         "clearance_limit_s": {"$ref": "#/$defs/positive_number"}
       }

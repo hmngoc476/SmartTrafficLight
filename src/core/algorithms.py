@@ -12,8 +12,18 @@ class RandomSource(Protocol):
         ...
 
 
+def allocate_green_fixed(green_budget: int, min_green: int) -> tuple[int, int]:
+    """Fixed-Time chia gần đều; cùng miền hợp lệ với Adaptive."""
+    from src.models.config import integer
+    integer('green_budget', green_budget, 2)
+    integer('min_green', min_green, 1)
+    if green_budget < 2 * min_green:
+        raise ValueError('green_budget phải >= 2 * min_green.')
+    return green_budget // 2, green_budget - green_budget // 2
+
+
 def poisson_sample(lam: float, rng: RandomSource) -> int:
-    """TODO: Lấy một mẫu Poisson với kỳ vọng lam xe trong một tick.
+    """Lấy một mẫu Poisson với kỳ vọng lam xe trong một tick.
 
     Args:
         lam: Số hữu hạn >= 0; nhận int/float, không nhận bool.
@@ -28,14 +38,12 @@ def poisson_sample(lam: float, rng: RandomSource) -> int:
     Raises:
         TypeError: Kiểu lam sai (kể cả bool) hoặc rng thiếu random callable.
         ValueError: lam âm, NaN hoặc vô cực.
-        NotImplementedError: Trạng thái hiện tại của scaffold Task 3.
 
     Hợp đồng ngày 15/10: validate lam và rng trước khi lấy mẫu; lam lỗi
     không làm thay đổi RNG. Dự kiến dùng Knuth trong miền lambda nhỏ.
     Thứ tự gọi N -> S -> E -> W do SimulationEngine chịu trách nhiệm.
     Hàm không tạo Vehicle, sửa Queue, đọc cấu hình hoặc truy cập UI.
     """
-    #raise NotImplementedError("Poisson chưa được triển khai; dự kiến ngày 15/10/2026.")
     # 1. Kiểm tra kiểu lam; bool phải bị từ chối dù bool là subclass của int.
     if isinstance(lam, bool) or not isinstance(lam, (int, float)):
         raise TypeError("lam phải là int hoặc float, không phải bool.")

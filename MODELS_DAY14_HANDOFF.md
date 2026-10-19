@@ -1,5 +1,9 @@
 # Bàn giao nhiệm vụ Models ngày 14/10/2026
 
+Cập nhật 19/10: Config/Vehicle đã đồng bộ miền hình học xe 1.8m và ngưỡng
+dừng <=0.1m/s; xem [Core ngày 18–19](docs/core_day18_19.md). Các số test/bàn giao
+ngày 14 bên dưới là lịch sử.
+
 Ghi chú API ngày 15/10/2026: nhóm chốt bỏ `Vehicle.to_xy()`/`GeometryProtocol` và
 gọi trực tiếp `Geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)`.
 Đây là thay đổi hợp đồng so với V2.3 gốc; Models chỉ giữ dữ liệu Vehicle,

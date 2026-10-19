@@ -101,6 +101,7 @@ def test_schema_cross_field_rules_need_manager(example, validator):
         (("configs", 0, "motion_2d", "accel_mps2"), 0),
         (("configs", 0, "motion_2d", "approach_visible_m"), 0),
         (("configs", 0, "motion_2d", "intersection_width_m"), 0),
+        (("configs", 0, "motion_2d", "intersection_width_m"), 3.59),
         (("configs", 0, "motion_2d", "stop_margin_m"), -1),
         (("configs", 0, "motion_2d", "clearance_limit_s"), 0),
     ],

@@ -39,7 +39,10 @@ def test_crossing_moves_once_and_timestamps_end_of_substep():
     movement = MovementEngine(cfg, lanes)
     controller = TrafficLightController(cfg)
     controller.start_next_cycle(dict.fromkeys('NSEW', 0), cycle_no=1, started_at=0, conflict_clear=True)
-    vehicle = movement.spawn_and_enqueue('N', 0)
+    # Xe tồn ban đầu: TC-23 ngày 18 chặn xe MỚI trước arrival+1s.
+    # Test này chỉ kiểm tra một lần cập nhật/crossing trong mỗi substep.
+    movement.initialize_queue('N', 1)
+    vehicle = lanes['N'].peek()
     vehicle.update_motion(-.01, 1)
     lanes['N'].reset_green_clock(0, 0, cfg.headway_s)
     movement.advance_substep(0, .2, controller)

@@ -1,10 +1,8 @@
 # Controller API Contract V2.3
 
-Trạng thái: **đã hiện thực cho task đến hết 17/10; chờ review Pull Request #9**.
-Nguồn implementation chính: `feat/algorithm`, `src/core/controller.py`.
-`feat/simulation` dùng cùng Controller, không duy trì bản thuật toán khác.
-PR #13 chỉ bàn giao tài liệu trùng; việc tài liệu xuất hiện trên một nhánh không
-có nghĩa nhánh đó đã chứa implementation của PR #9.
+Trạng thái: **Controller đã hợp nhất vào main; Core tiếp tục đến task 18–19**.
+Nguồn Controller duy nhất là `src/core/controller.py`; không duy trì bản riêng
+cho Simulation. Xem [Core ngày 18–19](core_day18_19.md) cho policy/replay/physics.
 
 Tài liệu thay thế draft ngày 15/10. Căn cứ: Thiết kế hệ thống D2.3/V2.3,
 §§7.3, 8, 9, 10 và hợp đồng Models/Snapshot hiện có trên main.
@@ -24,7 +22,7 @@ Kết quả pytest phải lấy từ lần chạy ở head PR, không dùng số
 ## 2. Public API đã có
 
 ```python
-TrafficLightController(config: Config)
+TrafficLightController(config: Config, *, policy='adaptive')
 controller.compute_phase_demand(queue_lengths) -> tuple[int, int]
 controller.compute_utilization(q_ns, q_ew, prev_green) -> dict[str, float]
 controller.build_cycle_plan(queue_lengths, *, cycle_no) -> SignalPlan
@@ -84,7 +82,10 @@ Queue mới, truyền cycle_no+1/started_at vào Controller và chỉ cập nh�
 sau activation thành công. Lỗi activation phải dừng ở ERROR an toàn.
 
 Engine thông báo Lane.reset_green_clock đúng một lần ở entry GREEN; tắt clock
-khi rời GREEN. Movement kết hợp signal, startup/headway, vị trí và FIFO.
+khi rời GREEN và giữ lịch sử crossing cuối của làn qua các pha/chu kỳ.
+Entry GREEN chờ cả `green_start + startup_delay_s` và
+`last_crossed_at + headway_s` (nếu đã có crossing). Reset toàn phiên mới xóa
+lịch sử. Movement kết hợp signal, startup/headway, vị trí và FIFO.
 Controller không trực tiếp sửa Lane. Pause giữ thời gian, Step tiến có kiểm soát
 và giữ PAUSED, Reset tạo lại RNG/plan/counters từ bản chốt Config.
 
@@ -103,10 +104,10 @@ Controller hiện có cơ chế nhận conflict_clear, giữ ALL_RED tại remai
 Đây là behavior đang có để không làm hỏng caller; Engine luôn truyền bool
 occupancy tường minh, không dựa vào default True khi tích hợp.
 
-Nghiệm thu occupancy vật lý/vehicle width, min_gap toàn diện và clearance guard
-thuộc task 18/10; hành vi khi motion_2d.enabled=False vẫn cần thống nhất trong
-phần đó. Đợt sửa đến 17 không tuyên bố đã nghiệm thu các phần này.
-CSV/dashboard/đối chứng Fixed-Time thuộc các task sau.
+Cập nhật 18–19: Movement dùng hình bao đầy đủ, xe rộng 1.8m và kiểm tra
+invariants sau substep; occupancy bool luôn được Engine truyền tường minh.
+Fixed-Time dùng cùng Controller/guard, chỉ đổi phân bổ xanh. fail_safe() giữ
+bốn đèn đỏ khi Engine phát hiện vi phạm bất biến. CSV/dashboard UI để riêng.
 
 ## 7. Kiểm thử đến hết 17/10
 

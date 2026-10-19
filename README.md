@@ -10,11 +10,11 @@ giao diện thông báo và smoke tests.
 Hiện tại đã có Config theo JSON V2, Poisson, Adaptive và đọc/ghi JSON cấu hình.
 Config dùng `rates_per_min`, `motion_2d.enabled` và thời lượng tín hiệu kiểu `int`.
 `data/junctions.json` khởi tạo với `configs: []`; dữ liệu mẫu nằm riêng trong
-`docs/examples/junctions_v2.example.json`. Controller, SimulationEngine, MovementEngine và Statistics đến task 17 đã có trên nhánh này; renderer/UI vẫn là khung.
+`docs/examples/junctions_v2.example.json`. Core Algorithms/Simulation đến task 18–19 đã có: hình bao xe 1,8m, clearance, invariants, thống kê và đối chứng Fixed-Time. Renderer/UI vẫn là khung.
 
 ## Phạm vi
 
-Một ngã tư bốn hướng **N/S/E/W**, hai pha **NS/EW**, dự kiến mô phỏng xe 2D.
+Một ngã tư bốn hướng **N/S/E/W**, hai pha **NS/EW**, mô phỏng xe 2D trong Core.
 SimulationEngine dùng tick 1 giây; MovementEngine dùng substep 0,2 giây mặc định.
 
 ## Công nghệ
@@ -27,7 +27,7 @@ Dependencies được quản lý trong `pyproject.toml` và khóa bằng `uv.loc
 | Thư mục / file | Vai trò |
 | --- | --- |
 | `src/models/` | Config/validation, Vehicle, Lane FIFO, SignalPlan và snapshot đã được nối với engine |
-| `src/core/` | Poisson, Adaptive, hình học, quản lý cấu hình và JSON đã có; Controller, hai engine và thống kê tick/chu kỳ đến 17/10 đã có |
+| `src/core/` | Poisson/Adaptive/Fixed-Time, Controller, hình học/Movement, replay arrivals, thống kê và đối chứng; quản lý cấu hình JSON |
 | `src/ui/` | Khung renderer 2D |
 | `src/app.py` | Điểm vào Streamlit với hai tab, chỉ hiển thị thông báo đang phát triển |
 | `data/junctions.json` | Cấu hình khởi tạo hợp lệ: schema_version 2, configs rỗng |
@@ -115,11 +115,11 @@ uv run streamlit run src/app.py
 | --- | --- |
 | 12/10 – Nền tảng V2.3 | Bộ khung, cấu hình mẫu, giao diện hai tab và smoke tests |
 | Models | Config, snapshot, Vehicle, Lane FIFO và SignalPlan đã tích hợp Core |
-| Thuật toán | Poisson và Adaptive + t_min đã có implementation và kiểm thử |
+| Thuật toán | Poisson, Adaptive + t_min, Fixed-Time và arrivals replay đã có |
 | Mô phỏng | Đã có tick 1 giây, chuyển động 2D substep 0,2 giây và snapshot |
 | UI hoàn chỉnh | Dự kiến: chỉnh cấu hình và hiển thị xe 2D |
-| Lưu trữ / thống kê | JSON và thống kê tick/chu kỳ trong RAM đã có; CSV chưa triển khai |
-| Tích hợp | Core đến 17/10 đã có test; UI và an toàn chuyên sâu cần đánh giá tiếp |
+| Lưu trữ / thống kê | JSON và thống kê tick/chu kỳ/phiên đã có; CSV lịch sử UI chưa triển khai |
+| Tích hợp | Core 18–19 có test hình bao/gap/clearance, metrics/invariants và so sánh cùng horizon; UI tách riêng |
 
 Kết quả chạy lệnh và trạng thái GitHub được báo cáo riêng khi bàn giao; không
 coi các chức năng dự kiến là đã hoạt động.
@@ -157,11 +157,15 @@ Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI
   `peek()` xem đầu, `pop_crossed()` lấy đầu đã crossing; cả hai trả None khi rỗng.
   Pop khi đầu chưa crossing raise ValueError và giữ nguyên Queue.
   `get_vehicles()` trả tuple, `count()` đếm mọi xe còn trong Queue.
-- Controller gọi `reset_green_clock(started_at, startup_delay_s, headway_s)`
-  khi bắt đầu xanh: thời điểm đủ điều kiện đầu tiên là start + startup delay.
+- Engine gọi `reset_green_clock(started_at, startup_delay_s, headway_s)`
+  khi bắt đầu xanh: thời điểm đủ điều kiện là
+  `max(start + startup delay, crossing cuối cùng + headway)` nếu đã có crossing;
+  nếu chưa có thì dùng `start + startup delay`.
   Sau pop, đồng hồ kế tiếp là max(đồng hồ cũ, crossed_stop_t + headway).
   `is_cross_eligible(t)` chỉ kiểm tra đồng hồ và Queue, không cấp quyền qua đèn.
-  `reset_green_clock()` xóa clock khi kết thúc xanh; không xóa xe.
+  `reset_green_clock()` tắt clock khi kết thúc xanh; giữ xe và lịch sử crossing
+  qua vàng/đỏ, qua chu kỳ và cả khi Queue rỗng. Reset toàn phiên tạo Lane mới,
+  xóa lịch sử crossing.
 
 JSON khởi tạo dùng `{"schema_version": 2, "configs": []}` theo hợp đồng main.
 `Config.from_dict()` nhận một phần tử trong `configs`; `to_dict()` trả đúng
@@ -190,3 +194,30 @@ ngày 18 và tích hợp hai engine trên PR #15 được đánh giá riêng.
 Xem [hợp đồng runtime](docs/simulation_day17.md) để biết lifecycle, Step/Stop,
 ownership theo ID, thống kê và phạm vi test. App hiện vẫn chỉ có hai tab thông báo;
 kiểm thử Core pass không đồng nghĩa đã có ứng dụng UI hoàn chỉnh.
+
+
+## Core ngày 18–19 và thí nghiệm không cần UI
+
+Xem [hợp đồng và tiêu chí nghiệm thu](docs/core_day18_19.md). Bề rộng vật lý
+1,8m được chốt cho Core, vì vậy giao lộ phải rộng ít nhất 3,6m để chứa hai làn.
+JSON V2 giữ nguyên bộ khóa; Geometry.for_motion truyền rõ width vào Snapshot.
+
+```python
+from src.models.config import Config
+from src.core.comparison import compare_policies
+
+result = compare_policies(Config(seed=42), horizon_s=180)
+print(result.to_dict())
+```
+
+Hai policy dùng cùng bảng arrivals và cùng H giây; số chu kỳ có thể khác.
+Kết quả ERROR/không đủ H có comparable=False. Chạy 6 kịch bản × 10 seed:
+
+```bash
+uv run python -m src.core.experiment --horizon 180 --output reports/comparison.json
+uv run pytest
+```
+
+Output là báo cáo thí nghiệm, không phải sim_history.csv/cycle_metrics.csv của UI.
+Không mặc định Adaptive tốt hơn ở mọi kịch bản. Giao diện Streamlit chưa được
+nối với những API Core mới trong đợt này.

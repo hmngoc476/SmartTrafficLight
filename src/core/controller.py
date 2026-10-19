@@ -26,11 +26,14 @@ DIRECTIONS: tuple[str, ...] = ("N", "S", "E", "W")
 class TrafficLightController:
     """Điều khiển chu kỳ tín hiệu sáu đoạn chuẩn xác và an toàn."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, *, policy: str = 'adaptive') -> None:
         """Khởi tạo Controller ở trạng thái UNSTARTED với bản sao tách biệt của Config."""
         if not isinstance(config, Config):
             raise TypeError("config phải là Config.")
         config.validate()
+        if policy not in ('adaptive', 'fixed'):
+            raise ValueError('policy phải là adaptive hoặc fixed.')
+        self._policy = policy
         self._config = Config.from_dict(config.to_dict())
 
         # Trạng thái vòng đời và lịch tín hiệu
@@ -145,9 +148,11 @@ class TrafficLightController:
                 raise ValueError(f"cycle_no mới ({cycle_no}) phải bằng cycle_no cũ + 1 ({self._cycle_no + 1}).")
 
         q_ns, q_ew = self.compute_phase_demand(queue_lengths)
-        g_ns, g_ew = algorithms.allocate_green_adaptive(
-            q_ns, q_ew, self._config.green_budget_s, self._config.min_green_s
-        )
+        if self._policy == 'fixed':
+            g_ns, g_ew = algorithms.allocate_green_fixed(self._config.green_budget_s, self._config.min_green_s)
+        else:
+            g_ns, g_ew = algorithms.allocate_green_adaptive(
+                q_ns, q_ew, self._config.green_budget_s, self._config.min_green_s)
         return SignalPlan.from_config(self._config, g_ns, g_ew, cycle_no=cycle_no)
 
     def start_next_cycle(
@@ -301,6 +306,14 @@ class TrafficLightController:
             return False
 
         return self._current_segment.is_green_for(direction)
+
+    def fail_safe(self) -> None:
+        """Dừng do vi phạm bất biến; không phục vụ crossing mới, giữ tất cả đỏ."""
+        self._in_error = True
+        self._cycle_complete = False
+        self._remaining_s = 0
+        self._current_segment = None
+        self._last_segment_code = 'ALL_RED_2'
 
     def to_signal_snapshot(self) -> SignalSnapshot:
         """Tạo đối tượng SignalSnapshot bất biến theo chuẩn Models."""

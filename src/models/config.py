@@ -6,6 +6,9 @@ from typing import Any
 
 DIRECTIONS = ('N', 'S', 'E', 'W')
 
+# Giả định vật lý đã chốt; không thêm trường JSON V2.
+PHYSICAL_VEHICLE_WIDTH_M = 1.8
+
 
 def number(name: str, value: object, low: float | None = None,
            high: float | None = None, *, positive: bool = False) -> None:
@@ -82,6 +85,8 @@ class Motion2DConfig:
             number(name, getattr(self, name), positive=True)
         for name in ('min_gap_m', 'stop_margin_m'):
             number(name, getattr(self, name), low=0)
+        if self.intersection_width_m < 2 * PHYSICAL_VEHICLE_WIDTH_M:
+            raise ValueError('intersection_width_m phải >= 3.6m để chứa hai làn xe rộng 1.8m.')
 
 
 @dataclass

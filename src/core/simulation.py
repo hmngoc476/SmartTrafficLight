@@ -1,37 +1,45 @@
-"""Điều phối phiên, tick 1s, Movement substep và thống kê đến task 17/10."""
+"""Điều phối Core: chu kỳ hoặc horizon, replay arrivals, invariants và thống kê."""
 
 import random
 
 from src.core.algorithms import poisson_sample
+from src.core.arrivals import ArrivalTape
 from src.core.controller import TrafficLightController
 from src.core.geometry import Geometry
 from src.core.movement import MovementEngine
 from src.core.statistics import SimulationStats
 from src.models.config import Config, integer
 from src.models.lane import Lane
+from src.models.vehicle import STOPPED_SPEED_MPS
 from src.models.snapshot import DIRECTIONS, MetricsSnapshot, SessionState, SimulationSnapshot, VehicleSnapshot
 
 
 class SimulationEngine:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, *, policy: str = 'adaptive',
+                 arrival_tape: ArrivalTape | None = None, horizon_s: int | None = None) -> None:
         if not isinstance(config, Config):
             raise TypeError('config phải là Config.')
         config.validate()
+        if horizon_s is not None:
+            integer('horizon_s', horizon_s, 1)
+        if arrival_tape is not None:
+            if not isinstance(arrival_tape, ArrivalTape):
+                raise TypeError('arrival_tape phải là ArrivalTape.')
+            if horizon_s is None or len(arrival_tape.rows) < horizon_s:
+                raise ValueError('Replay yêu cầu horizon_s và đủ hàng arrivals.')
+        self._policy = policy
+        self._arrival_tape = arrival_tape
+        self._horizon_s = horizon_s
+        self._error_message = None
         self._config = Config.from_dict(config.to_dict())
         self._sim_time = 0
         self._cycle_index = 1
         self._session_state: SessionState = 'PAUSED'
         self._started = False
         self._rng = random.Random(self._config.seed)
-        self._geometry = Geometry(
-            intersection_width_m=self._config.motion_2d.intersection_width_m,
-            approach_visible_m=self._config.motion_2d.approach_visible_m,
-            vehicle_length_m=self._config.motion_2d.vehicle_length_m,
-            min_gap_m=self._config.motion_2d.min_gap_m,
-            stop_margin_m=self._config.motion_2d.stop_margin_m,
-        )
+        self._geometry = Geometry.for_motion(self._config.motion_2d)
         self._lanes = {d: Lane(d) for d in DIRECTIONS}
-        self._controller = TrafficLightController(self._config)
+        self._controller = TrafficLightController(self._config, policy=policy)
         self._movement = MovementEngine(self._config, self._lanes, self._geometry)
         for direction in DIRECTIONS:
             self._movement.initialize_queue(direction, self._config.initial_queue[direction])
@@ -39,6 +47,14 @@ class SimulationEngine:
         self._stats = SimulationStats(self._initial_total)
         self._activate_cycle(self._queue_lengths(), 1, conflict_clear=True)
         self._update_lane_green_clocks()
+
+    @property
+    def policy(self) -> str:
+        return self._policy
+
+    @property
+    def error_message(self) -> str | None:
+        return self._error_message
 
     @property
     def sim_time(self) -> int:
@@ -109,7 +125,7 @@ class SimulationEngine:
         self._session_state = 'STOPPED'
 
     def reset(self) -> None:
-        self.__init__(self._config)
+        self.__init__(self._config, policy=self._policy, arrival_tape=self._arrival_tape, horizon_s=self._horizon_s)
 
     def tick(self) -> SimulationSnapshot:
         """Tick tự động chỉ chạy khi RUNNING; Step sử dụng run_ticks khi PAUSED."""
@@ -118,17 +134,29 @@ class SimulationEngine:
         return self._advance_tick()
 
     def _advance_tick(self) -> SimulationSnapshot:
+        try:
+            return self._perform_tick()
+        except (AssertionError, ValueError, RuntimeError) as error:
+            self._error_message = str(error)
+            self._controller.fail_safe()
+            self._session_state = 'ERROR'
+            raise
+
+    def _perform_tick(self) -> SimulationSnapshot:
         t = self._sim_time
         dt = self._config.motion_2d.dt_s
-        for direction in DIRECTIONS:
-            count = poisson_sample(self._config.rates_per_min[direction] / 60, self._rng)
+        replay_row = self._arrival_tape.at(t) if self._arrival_tape is not None else None
+        for index, direction in enumerate(DIRECTIONS):
+            count = (replay_row[index] if replay_row is not None else
+                     poisson_sample(self._config.rates_per_min[direction] / 60, self._rng))
             for _ in range(count):
                 self._movement.spawn_and_enqueue(direction, arrival_t=t)
             self._stats.record_arrival(direction, count)
         for step in range(round(1 / dt)):
-            self._movement.advance_substep(t=t + step * dt, dt=dt, controller=self._controller)
-        for vehicle in (*self._movement.active_crossing.values(), *self._movement.exited_vehicles):
-            self._stats.record_departure(vehicle)
+            crossed = self._movement.advance_substep(t=t + step * dt, dt=dt, controller=self._controller)
+            for vehicle in crossed:
+                self._stats.record_departure(vehicle)
+            self._metrics_snapshot()  # Hai đẳng thức bảo toàn sau mỗi substep.
         conflict_clear = self._movement.is_conflict_clear()
         previous_segment = self._controller.current_segment_code
         self._controller.tick(conflict_clear=conflict_clear)
@@ -136,18 +164,25 @@ class SimulationEngine:
         self._stats.capture_tick(self._sim_time, self._metrics_snapshot())
         if self._controller.in_error:
             self._session_state = 'ERROR'
+            self._error_message = 'Clearance hold vượt giới hạn.'
         elif self._controller.cycle_complete:
             queues = self._queue_lengths()
             # Chốt chu kỳ cũ trước khi Controller tính lại lịch từ Queue mới.
             self._stats.close_cycle(self._sim_time, queues)
-            if self._cycle_index >= self._config.cycles_to_run:
+            if self._horizon_s is not None and self._sim_time >= self._horizon_s:
+                self._session_state = 'STOPPED'
+            elif self._horizon_s is None and self._cycle_index >= self._config.cycles_to_run:
                 self._session_state = 'COMPLETED'
             else:
                 try:
                     self._activate_cycle(queues, self._cycle_index + 1, conflict_clear=conflict_clear)
-                except (RuntimeError, TypeError, ValueError):
+                except (RuntimeError, TypeError, ValueError) as error:
                     # Controller activation atomic; lỗi giữ terminal ALL_RED của chu kỳ cũ.
                     self._session_state = 'ERROR'
+                    self._error_message = str(error)
+        if (self._session_state != 'ERROR' and self._horizon_s is not None
+                and self._sim_time >= self._horizon_s):
+            self._session_state = 'STOPPED'
         if self._controller.current_segment_code != previous_segment:
             self._update_lane_green_clocks()
         return self.snapshot()
@@ -163,6 +198,12 @@ class SimulationEngine:
             self._advance_tick()
         return self.snapshot()
 
+    def summary(self) -> dict:
+        return dict(self._stats.summary(), policy=self._policy, config_id=self._config.id,
+                    seed=self._config.seed, status=self._session_state,
+                    min_gap_violations=self._movement.min_gap_violations,
+                    error_message=self._error_message)
+
     def _metrics_snapshot(self) -> MetricsSnapshot:
         return MetricsSnapshot(
             queue_lengths=self._queue_lengths(), initial_total=self._initial_total,
@@ -177,7 +218,7 @@ class SimulationEngine:
         vehicles = []
         for direction in DIRECTIONS:
             for vehicle in self._lanes[direction].get_vehicles():
-                vehicles.append(self._vehicle_snapshot(vehicle, 'STOPPED' if vehicle.speed_mps == 0 else 'APPROACHING'))
+                vehicles.append(self._vehicle_snapshot(vehicle, 'STOPPED' if vehicle.speed_mps <= STOPPED_SPEED_MPS + 1e-9 else 'APPROACHING'))
         for vehicle in self._movement.active_crossing.values():
             vehicles.append(self._vehicle_snapshot(vehicle, 'CROSSING'))
         return SimulationSnapshot(

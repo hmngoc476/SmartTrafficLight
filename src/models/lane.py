@@ -15,6 +15,7 @@ class Lane:
         self._next_cross_eligible_at: float | None = None
         self._headway_s: float = 1.0
         self._last_arrival_t: float | None = None
+        self._last_crossed_at: float | None = None
 
     @property
     def direction(self) -> str:
@@ -61,6 +62,7 @@ class Lane:
                             vehicle.crossed_stop_t + self._headway_s)
             number('Thời điểm headway tiếp theo', next_time, low=0)
         self._queue.popleft()
+        self._last_crossed_at = vehicle.crossed_stop_t
         self._next_cross_eligible_at = next_time
         return vehicle
 
@@ -74,14 +76,16 @@ class Lane:
 
     def reset_green_clock(self, started_at: float | None = None,
                           startup_delay_s: float = 0.0, headway_s: float = 1.0) -> None:
-        """Bắt đầu xanh: eligible=start+startup; None xóa clock khi kết thúc xanh."""
+        """Xanh mới phải đủ startup và headway; None tắt clock, giữ lịch sử crossing."""
         number('startup_delay_s', startup_delay_s, low=0)
         number('headway_s', headway_s, low=1)
         eligible = None
         if started_at is not None:
             number('started_at', started_at, low=0)
             eligible = started_at + startup_delay_s
-            number('Thời điểm đủ startup delay', eligible, low=0)
+            if self._last_crossed_at is not None:
+                eligible = max(eligible, self._last_crossed_at + headway_s)
+            number('Thời điểm đủ startup delay/headway', eligible, low=0)
         self._green_started_at = started_at
         self._next_cross_eligible_at = eligible
         self._headway_s = headway_s

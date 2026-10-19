@@ -1,5 +1,8 @@
 # Hợp đồng hình học 2D và SimulationSnapshot
 
+Cập nhật 18–19: xem [core_day18_19.md](core_day18_19.md). Các quyết định dưới đây
+về width/hình bao/biên đã được hiện thực; bảng Task 4 còn lại là lịch sử.
+
 Cập nhật đến 17/10: hai engine, Controller và Statistics đã hiện thực trên
 feat/simulation; xem [hợp đồng runtime ngày 17](simulation_day17.md) và
 [hợp đồng Controller](controller_contracts.md). Các trạng thái Task 4 bên dưới
@@ -138,17 +141,16 @@ không mở rộng vùng lần nữa nếu đã dùng AABB đầy đủ của xe
 Ví dụ N có đầu (-2, 10), dài 4,5m thì đuôi (-2, 5.5) vẫn trong vùng:
 đầu xe ra khỏi vùng chưa đủ để cấp xanh đối diện.
 
-**Bề rộng chưa có trong cấu hình V2.3.** Geometry giữ `vehicle_width_m=None`,
-không âm thầm dùng chiều rộng chuẩn. Nhóm có thể chọn 1,8m như một tham số minh
-họa bổ sung, nhưng phải xác nhận và ghi vào cấu hình trước khi hiện thực occupancy.
-Đề xuất engine từ chối chạy clearance vật lý khi thiếu width; không trả True
-cho `is_conflict_clear()` chỉ vì thiếu thông tin. Width hiển thị bằng pixel
-trong UI không được xem là kích thước vật lý của xe.
+**Bề rộng vật lý đã chốt 1,8m ngày 19/10/2026.** Geometry() giữ default
+None cho metadata/API lịch sử; Geometry.for_motion(motion) truyền rõ 1.8m vào
+Core và Snapshot. Không thêm key JSON V2. Giao lộ phải >=3.6m để đủ hai làn;
+offset=min(2m, width/4), đảm bảo thân xe nằm trong phần đường mỗi hướng.
+Config và JSON Schema được đồng bộ miền này. Thiếu width thì kiểm tra hình
+bao báo lỗi, không tự coi vùng trống. Không lấy bề rộng biểu tượng UI làm vật lý.
 
-Occupancy/AABB vật lý chưa được nghiệm thu. `is_conflict_clear()` hiện có
-kiểm tra dọc làn cơ bản; mô hình hình bao theo mô tả dưới đây thuộc task 18 và
-tương lai chỉ True nếu mọi xe active_crossing đều không giao vùng xung đột;
-xe còn trong active_crossing nhưng đã ra khỏi vùng không giữ đỏ nữa.
+Movement.is_conflict_clear chỉ True khi mọi hình bao active đã ra khỏi vùng đóng.
+Xe active đã qua vùng nhưng chưa EXITED không giữ đỏ. Test vật lý ở
+`tests/test_physics_day18.py` và thí nghiệm cùng horizon đã thực thi.
 
 ## 8. Hợp đồng Geometry.lane_to_xy
 
@@ -275,7 +277,7 @@ Khi đuôi xe vượt giới hạn thế giới hiển thị, ghi exited_world_t
 tăng exited_world_total, không tăng crossed lần hai. **ĐỀ XUẤT THIẾT KẾ:** viewport
 đối xứng có biên ±(width/2 + approach_visible_m), mặc định ±68m; renderer clip
 xe ngoài viewport nhưng không tự thực hiện EXITED. Xe Queue ngoài viewport vẫn
-có trong snapshot và counters. Quy tắc EXITED hiện được MovementEngine xử lý; nghiệm thu biên viewport thuộc task 18.
+có trong snapshot và counters. Movement đã kiểm tra đuôi xe theo đúng tọa độ thế giới ở cả bốn hướng (test ngày 18).
 
 ## 13. min_gap, tín hiệu, clearance và nhịp thời gian
 
@@ -292,7 +294,7 @@ Xe đã crossing bỏ stop_limit và tiếp tục đi ra khỏi vùng, kể cả
 Khi ALL_RED hết danh định mà vùng còn chiếm, giữ đỏ từng tick và tăng
 clearance_hold_s. Chỉ cấp GREEN đối diện khi vùng trống. Quá clearance_limit_s
 thì ERROR và giữ tất cả đỏ; không cưỡng bức xanh. Hold không làm đổi green_budget
-hoặc min_green. Những ràng buộc này **mới được đặc tả**, chưa có code điều khiển.
+hoặc min_green. Những ràng buộc này đã có code điều khiển và test ngày 18; xem tài liệu Core mới.
 
 Một tick logic 1 giây gồm 5 substep × 0,2 giây. Poisson gọi một lần mỗi hướng
 mỗi tick, không gọi lại trong substep hoặc khi UI rerun. Pause không chạy tick;
@@ -340,8 +342,8 @@ không có xe cùng lúc ở Queue và active. Snapshot chưa chứng minh lịc
 | G-11 | JSON hợp lệ, schema và kiểu đúng, roundtrip không mất dữ liệu | Test DTO đã hiện thực |
 | G-12 | Geometry width=20, offset=3; N s=-4 →(-3,-14) | Test không hard-code hình mẫu |
 | G-13 | s NaN/inf, kiểu sai; Geometry âm/zero không hợp lệ | Test validation đã hiện thực |
-| G-14 | Đầu xe ra vùng, đuôi còn trong vùng → không clear | **CHƯA THỰC THI**, cần AABB/width |
-| G-15 | ALL_RED hold khi vùng chưa trống, timeout giữ ERROR/all-red | **CHƯA THỰC THI**, cần controller/engine |
+| G-14 | Đầu xe ra vùng, đuôi còn trong vùng → không clear | Đã có test vật lý ngày 18 (xem core_day18_19.md) |
+| G-15 | ALL_RED hold khi vùng chưa trống, timeout giữ ERROR/all-red | Đã có test Controller/Engine ngày 18 |
 | G-16 | Pause đứng yên, Step một lần Poisson + năm substep | **CHƯA THỰC THI**, cần engine |
 
 Test tương lai chỉ được ghi expected trong tài liệu, chưa được tính PASS hoặc
@@ -376,5 +378,5 @@ Trên checkout sạch, dùng lệnh pytest thông thường. Không xóa bản c
   không dùng JSON mẫu để giả vờ đang chạy mô phỏng thực.
 - Chạy test tích hợp trạng thái, gap, clearance, Pause/Step/Reset và bảo toàn xe.
 
-Phần cần nhóm xác nhận được đánh dấu rõ; chưa có quyết định nào về bề rộng xe
-được coi là thông số chính thức của V2.3. Trạng thái engine hiện tại được cập nhật tại simulation_day17.md.
+Danh sách trên là kế hoạch lịch sử. Bề rộng 1.8m đã được người dùng chốt;
+trạng thái hiện tại và API mới nằm trong core_day18_19.md.

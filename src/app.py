@@ -40,5 +40,3 @@ with configuration_tab:
     render_config_tab()
 with simulation_tab:
     render_simulation_tab()
-
-st.html('<svg width="100" height="40"><rect width="100" height="40" fill="red"/></svg>')

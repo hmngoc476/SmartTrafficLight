@@ -92,6 +92,8 @@ def explain_error(message: str) -> tuple[str | None, str]:
         return "cycles_to_run", "Số chu kỳ phải là số nguyên từ 1 đến 100."
     if text.startswith("dt_s") or text.startswith("1 / dt_s"):
         return "m_dt_s", "dt phải ≤ 1 và chia 1 giây thành số bước nguyên (ví dụ 0.2 giây = 5 bước)."
+    if text.startswith("intersection_width_m"):
+        return "m_intersection_width_m", "Bề rộng giao lộ phải ≥ 3,6m để chứa hai làn xe rộng 1,8m."
     for name in SCALAR_KEYS:
         if text.startswith(name):
             return name, f"{FIELD_LABELS[name]} phải là số nguyên trong miền hợp lệ."

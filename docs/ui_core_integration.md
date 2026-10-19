@@ -27,3 +27,21 @@ không thay công thức Adaptive/Fixed-Time, Poisson, headway, chuyển động
 Các lần đọc báo cáo không tick, không tạo lại Engine, không gọi Adaptive.
 Metadata run_id/started_at_iso của UI/CSV nằm ngoài Snapshot và dict summary
 chuẩn; metadata chỉ tạo mới có kiểm soát khi Start/Reset.
+
+## Điều khiển và timer UI
+
+Hai tab dùng session_state/has_started. Start sau Reset chạy lại bản chốt cũ,
+kể cả khi cấu hình đã lưu được chỉnh sửa trong lúc phiên trước đang chạy.
+Tab 1 có thể sửa draft/lưu cấu hình cho phiên sau; không đổi tham số phiên hiện tại.
+
+Timer là component HTML/JS nội bộ, không phụ thuộc CDN hoặc package bổ sung.
+Mỗi giây khi RUNNING phát (epoch, sequence). Chỉ sự kiện mới của epoch đã arm
+mới được gọi một tick Core; rerun do widget/đổi tab chỉ render, không tự tick.
+Pause/Stop vô hiệu epoch; Resume dùng epoch mới để bỏ sự kiện cũ đang chờ.
+Không đổi dt theo thời gian trình duyệt. Step và chạy chu kỳ chỉ bật ở PAUSED
+đã Start. Renderer lấy width vật lý từ Snapshot nếu có.
+
+Hai file CSV dùng header V2.3 tại ui_storage_contracts.md §14. UI bổ sung
+run_id, started_at_iso (ISO có timezone), chỉ đưa phiên STOPPED/COMPLETED
+và chu kỳ đã chốt vào lịch sử. ERROR giữ báo cáo chẩn đoán, không tự ghi vào
+schema lịch sử vốn chỉ cho phép STOPPED/COMPLETED.

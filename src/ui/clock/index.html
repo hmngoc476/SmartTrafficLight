@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body>
+<script>
+let epoch = null, sequence = 0, interval = null;
+function send(type, payload) {
+  window.parent.postMessage({isStreamlitMessage: true, type, ...payload}, '*');
+}
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || event.data.type !== 'streamlit:render') return;
+  const args = event.data.args;
+  if (args.epoch !== epoch) {
+    clearInterval(interval); interval = null;
+    epoch = args.epoch; sequence = 0;
+  }
+  if (!args.running || !epoch) {
+    clearInterval(interval); interval = null;
+  } else if (interval === null) {
+    interval = setInterval(() => {
+      sequence += 1;
+      send('streamlit:setComponentValue', {value: {epoch, sequence}, dataType: 'json'});
+    }, 1000);
+  }
+  send('streamlit:setFrameHeight', {height: 0});
+});
+send('streamlit:componentReady', {apiVersion: 1});
+send('streamlit:setFrameHeight', {height: 0});
+</script></body></html>

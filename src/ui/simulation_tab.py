@@ -7,6 +7,8 @@ xe, không tính Adaptive, không sửa Queue hoặc CSV.
 from __future__ import annotations
 
 from html import escape
+from datetime import datetime, timezone
+from uuid import uuid4
 
 import streamlit as st
 
@@ -17,45 +19,56 @@ from src.models.snapshot import SimulationSnapshot
 from src.ui import charts, state
 from src.ui.labels import T
 from src.ui.renderer_2d import VEHICLE_STYLE, build_map_figure
+from src.ui.timer import timer_event
 
 S = st.session_state
 FINISHED = ("STOPPED", "COMPLETED", "ERROR")
-AUTORUN = hasattr(st, "fragment")   # tự chạy 1 tick/giây cần Streamlit >= 1.37
 
 
 # ----------------------------------------------------------------------
 # Callbacks
 # ----------------------------------------------------------------------
-def _run(action, *args) -> None:
+def _run(action, *args) -> bool:
     try:
         action(*args)
         S.sim_notice = None
+        return True
     except Exception as error:  # noqa: BLE001 - hiển thị lý do cho người dùng
         S.sim_notice = str(error)
+        return False
 
 
 def on_start() -> None:
     def go() -> None:
-        data = state.get_config(S.use_config_id or S.selected_config_id)
-        if data is None:
-            raise RuntimeError("Chưa có cấu hình hợp lệ để chạy; chọn hoặc tạo ở Tab 1.")
-        engine = SimulationEngine(Config.from_dict(data))
+        if S.engine is not None and not S.engine.has_started:
+            engine, data = S.engine, S.run_config_snapshot
+        else:
+            data = state.get_config(S.use_config_id or S.selected_config_id)
+            if data is None:
+                raise RuntimeError("Chưa có cấu hình hợp lệ để chạy; chọn hoặc tạo ở Tab 1.")
+            engine = SimulationEngine(Config.from_dict(data))
+            S.run_id = uuid4().hex
         engine.start()
         S.engine, S.run_config_snapshot = engine, data   # bản chốt, không đổi khi sửa Tab 1
         S.summary_saved, S.pending_sim_reset = False, False
+        S.started_at_iso = datetime.now(timezone.utc).isoformat()
+        S.timer_epoch, S.timer_sequence = uuid4().hex, 0
     _run(go)
 
 
 def on_pause() -> None:
-    _run(S.engine.pause)
+    if _run(S.engine.pause):
+        S.timer_epoch = None
 
 
 def on_resume() -> None:
-    _run(S.engine.resume)
+    if _run(S.engine.resume):
+        S.timer_epoch, S.timer_sequence = uuid4().hex, 0
 
 
 def on_stop() -> None:
-    _run(S.engine.stop)
+    if _run(S.engine.stop):
+        S.timer_epoch = None
 
 
 def on_step() -> None:
@@ -75,23 +88,48 @@ def on_reset_cancel() -> None:
 
 
 def on_reset_confirm() -> None:
-    _run(S.engine.reset)
-    S.pending_sim_reset, S.summary_saved = False, False
+    if _run(S.engine.reset):
+        S.pending_sim_reset, S.summary_saved = False, False
+        S.run_id, S.started_at_iso = uuid4().hex, None
+        S.timer_epoch, S.timer_sequence = None, 0
 
 
-def _persist_history() -> None:
-    """Ghi sim_history.csv đúng một lần khi phiên có Summary."""
+def _persist_history(force: bool = False) -> None:
+    """Retain terminal reports until storage confirms both files; reruns do not retry blindly."""
     engine = S.engine
-    if engine is None or S.summary_saved:
+    if (engine is not None and engine.session_state in ('STOPPED', 'COMPLETED')
+            and S.run_id not in S.history_saved_ids and S.run_id not in S.history_outbox):
+        S.history_outbox[S.run_id] = dict(summary=engine.summary(), cycles=engine.stats.cycles,
+                                        run_id=S.run_id, started_at_iso=S.started_at_iso)
+    for run_id, payload in list(S.history_outbox.items()):
+        if not force and run_id in S.history_attempted:
+            continue
+        S.history_attempted.add(run_id)
+        try:
+            HistoryStorage.append_run(**payload)
+        except Exception as error:  # noqa: BLE001
+            S.sim_notice = f"Chưa ghi được lịch sử CSV: {error}"
+        else:
+            S.history_saved_ids.add(run_id)
+            del S.history_outbox[run_id]
+    S.summary_saved = S.run_id in S.history_saved_ids
+    if force and not S.history_outbox:
+        S.sim_notice = None
+
+
+def on_retry_history() -> None:
+    _persist_history(force=True)
+
+
+def apply_timer_event(event) -> None:
+    """Only a new event from the armed browser clock may advance an automatic tick."""
+    if (not isinstance(event, dict) or event.get('epoch') != S.timer_epoch
+            or not S.timer_epoch or type(event.get('sequence')) is not int
+            or event['sequence'] <= S.timer_sequence):
         return
-    summary = engine.summary()
-    if summary is None:
-        return
-    S.summary_saved = True
-    try:
-        HistoryStorage.append_run(summary, list(engine.cycle_metrics()))
-    except Exception as error:  # noqa: BLE001
-        S.sim_notice = f"Chưa ghi được lịch sử CSV: {error}"
+    S.timer_sequence = event['sequence']
+    if S.engine is not None and S.engine.session_state == 'RUNNING':
+        _run(S.engine.tick)
 
 
 # ----------------------------------------------------------------------
@@ -140,18 +178,10 @@ def _dash(value) -> str:
 
 
 # ----------------------------------------------------------------------
-# Phần dashboard (tự làm mới mỗi giây khi RUNNING)
+# Dashboard chỉ đọc; timer phát sự kiện riêng khi RUNNING.
 # ----------------------------------------------------------------------
 def _dashboard() -> None:
     engine = S.engine
-    if engine is not None and engine.state == "RUNNING" and AUTORUN:
-        try:
-            engine.run_ticks(1)
-        except Exception as error:  # noqa: BLE001
-            S.sim_notice = str(error)
-        if engine.state != "RUNNING":
-            st.rerun()   # đổi trạng thái: làm mới cả nút điều khiển
-
     dd = engine.dashboard_data() if engine is not None else None
     snap = dd.snapshot if dd else None
     run_cfg = S.run_config_snapshot if engine is not None else None
@@ -235,17 +265,21 @@ def _dashboard() -> None:
             s1, s2 = st.columns([5, 1.3])
             with s1:
                 if summary:
-                    wait = f"{summary.avg_wait_departed_s:.1f}s" if summary.avg_wait_departed_s is not None else "—"
-                    sub = (f"{summary.status} · {summary.departed_vehicles} xe đã qua vạch · còn chờ "
-                           f"{summary.remaining_vehicles} · chờ TB {wait}")
+                    wait = f"{summary['avg_wait_departed_s']:.1f}s" if summary['avg_wait_departed_s'] is not None else "—"
+                    stopped = f"{summary['avg_stopped_delay_s']:.1f}s" if summary['avg_stopped_delay_s'] is not None else "—"
+                    sub = (f"{summary['status']} · {summary['departed_vehicles']} xe đã qua vạch · còn chờ "
+                           f"{summary['remaining_vehicles']} · thời gian từ xuất hiện tới vượt vạch TB {wait}"
+                           f" · thời gian dừng TB {stopped}")
                 else:
                     sub = "Mở khi STOPPED/COMPLETED · không đồng nghĩa hết xe chờ"
                 st.markdown(f'<div class="sum-title">Summary cuối phiên: {"có" if summary else "chưa có"}</div>'
                             f'<div class="sum-sub">{sub}</div>', unsafe_allow_html=True)
             with s2:
-                data = summary_csv_text(summary, list(dd.cycle_metrics)) if summary else ""
-                st.download_button("Xuất CSV", data, file_name=f"{summary.run_id}.csv" if summary else "summary.csv",
-                                   mime="text/csv", key="btn_csv", disabled=summary is None)
+                exportable = summary is not None and summary['status'] in ('STOPPED', 'COMPLETED')
+                data = summary_csv_text(summary, dd.cycle_metrics, run_id=S.run_id,
+                                        started_at_iso=S.started_at_iso) if exportable else ""
+                st.download_button("Xuất CSV", data, file_name=f"{S.run_id}.csv" if exportable else "summary.csv",
+                                   mime="text/csv", key="btn_csv", disabled=not exportable)
 
     # ---- Ba biểu đồ ----
     c1, c2, c3 = st.columns(3, gap="small")
@@ -264,9 +298,14 @@ def _dashboard() -> None:
 # Render
 # ----------------------------------------------------------------------
 def render_simulation_tab() -> None:
+    engine = S.engine
+    event = timer_event(S.timer_epoch, bool(engine is not None and engine.session_state == 'RUNNING'),
+                        key=f"clock_{S.run_id or 'idle'}")
+    apply_timer_event(event)
     _persist_history()
     engine = S.engine
-    name = engine.state if engine is not None else "IDLE"
+    name = engine.session_state if engine is not None else "IDLE"
+    unstarted = engine is not None and not engine.has_started
     ready = S.manager is not None and state.get_config(S.use_config_id or S.selected_config_id) is not None
 
     # ---- Cấu hình đã chốt ----
@@ -288,14 +327,14 @@ def render_simulation_tab() -> None:
     # ---- Thanh điều khiển ----
     ctl = st.columns([113, 113, 129, 111, 113, 149, 213, 244, 590], gap="small")
     ctl[0].button("Start", key="sim_start", on_click=on_start,
-                  disabled=not (ready and (engine is None or name in FINISHED)))
+                  disabled=not (unstarted or ready and (engine is None or name in FINISHED)))
     ctl[1].button("Pause", key="sim_pause", on_click=on_pause, disabled=name != "RUNNING")
-    ctl[2].button("Resume", key="sim_resume", on_click=on_resume, disabled=name != "PAUSED")
-    ctl[3].button("Stop", key="sim_stop", on_click=on_stop, disabled=name not in ("RUNNING", "PAUSED"))
+    ctl[2].button("Resume", key="sim_resume", on_click=on_resume, disabled=name != "PAUSED" or unstarted)
+    ctl[3].button("Stop", key="sim_stop", on_click=on_stop, disabled=name not in ("RUNNING", "PAUSED") or unstarted)
     ctl[4].button("Reset", key="sim_reset", on_click=on_reset_ask,
                   disabled=engine is None or name == "RUNNING")
-    ctl[5].button("Step +1s", key="sim_step", on_click=on_step, disabled=name != "PAUSED")
-    ctl[6].button("Chạy hết chu kỳ", key="sim_cycle", on_click=on_cycle, disabled=name != "PAUSED")
+    ctl[5].button("Step +1s", key="sim_step", on_click=on_step, disabled=name != "PAUSED" or unstarted)
+    ctl[6].button("Chạy hết chu kỳ", key="sim_cycle", on_click=on_cycle, disabled=name != "PAUSED" or unstarted)
     ctl[8].markdown(
         f'<div class="status-box">{name}{T["status_suffix"]} · Step / Chạy chu kỳ chỉ bật khi PAUSED</div>',
         unsafe_allow_html=True)
@@ -309,16 +348,11 @@ def render_simulation_tab() -> None:
             b.button("Xác nhận Reset", key="sim_reset_confirm", on_click=on_reset_confirm)
     if S.sim_notice:
         st.markdown(f'<div class="field-err">{escape(S.sim_notice)}</div>', unsafe_allow_html=True)
-    if not AUTORUN and name == "RUNNING":
-        st.markdown('<div class="hint">Streamlit hiện tại chưa hỗ trợ tự chạy; hãy Pause rồi dùng Step +1s.</div>',
-                    unsafe_allow_html=True)
+    if S.history_outbox:
+        st.warning(f"Còn {len(S.history_outbox)} phiên chưa lưu đủ lịch sử; báo cáo được giữ để thử lại.")
+        st.button("Thử lại ghi lịch sử", key="sim_history_retry", on_click=on_retry_history)
 
-    # ---- Dashboard (fragment tự làm mới khi RUNNING) ----
-    if AUTORUN:
-        running = engine is not None and name == "RUNNING"
-        st.fragment(run_every=1.0 if running else None)(_dashboard)()
-    else:
-        _dashboard()
+    _dashboard()
 
     st.markdown('<p class="foot">Core → Snapshot / báo cáo chỉ đọc → Renderer · '
                 "UI không tự sinh xe, tính Adaptive, sửa Queue hoặc CSV</p>", unsafe_allow_html=True)

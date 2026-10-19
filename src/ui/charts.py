@@ -5,10 +5,10 @@
 """
 from __future__ import annotations
 
-from src.core.statistics import CycleMetric
+from src.core.statistics import CycleMetrics
 from src.ui.labels import T
 
-import streamlit.components.v1 as components
+import streamlit as st
 
 SVG_OPEN = '<svg width="560" height="104" viewBox="0 0 560 104" xmlns="http://www.w3.org/2000/svg">'
 LINE_COLOR = "#738795"
@@ -57,11 +57,11 @@ def _bar(x: float, width: float, value: float, unit: float, color: str, suffix: 
             f'<text class="cv" x="{x + width / 2:.1f}" y="{BASE_Y - height - 5:.1f}" text-anchor="middle">{shown}</text>')
 
 
-def _tail(cycles: list[CycleMetric]) -> list[CycleMetric]:
+def _tail(cycles: list[CycleMetrics]) -> list[CycleMetrics]:
     return cycles[-MAX_GROUPS:]
 
 
-def green_chart(cycles: tuple[CycleMetric, ...]) -> str:
+def green_chart(cycles: tuple[CycleMetrics, ...]) -> str:
     """Giây xanh NS/EW đã chốt theo chu kỳ."""
     groups = _tail(list(cycles))
     if not groups:
@@ -87,7 +87,7 @@ def green_chart(cycles: tuple[CycleMetric, ...]) -> str:
     return _caption() + SVG_OPEN + "".join(parts) + legend + "</svg>"
 
 
-def flow_chart(cycles: tuple[CycleMetric, ...]) -> str:
+def flow_chart(cycles: tuple[CycleMetrics, ...]) -> str:
     """Số xe đến và số xe qua vạch theo chu kỳ (chu kỳ đang chạy là bản tạm)."""
     groups = _tail(list(cycles))
     if not groups:
@@ -128,4 +128,4 @@ _IFRAME_CSS = (
 
 def render(html: str) -> None:
     """Vẽ một biểu đồ trong iframe riêng (không bị lọc SVG, tự mang CSS theo)."""
-    components.html(_IFRAME_CSS + html, height=132)
+    st.iframe(_IFRAME_CSS + html, height=132)

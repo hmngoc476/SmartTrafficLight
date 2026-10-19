@@ -3,8 +3,8 @@
 Bố cục lấy từ wireframe (8 px/mét, tâm giao lộ cố định):
 - cửa sổ hiển thị ±23,25 m quanh tâm (phần xe ngoài cửa sổ vẫn thuộc Core);
 - +x là Đông, +y là Nam (trục y đảo ngược khi vẽ);
-- x, y trong snapshot là đầu xe; biểu tượng xe chỉ để minh họa nên bề rộng
-  vẽ cố định, không thay cho bề rộng vật lý dùng kiểm tra xung đột.
+- x, y trong snapshot là đầu xe; ưu tiên bề rộng vật lý từ snapshot.
+  Metadata cũ thiếu width dùng icon minh họa, không thay luật xung đột Core.
 """
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def build_map_figure(snapshot: SimulationSnapshot | None, show_vehicles: bool = 
     dot_x: list[float] = []
     dot_y: list[float] = []
     if show_vehicles and snapshot:
-        w = VISUAL_VEHICLE_WIDTH_M / 2
+        w = (snapshot.geometry.vehicle_width_m or VISUAL_VEHICLE_WIDTH_M) / 2
         for v in snapshot.vehicles:
             dx, dy = DIRECTION_VECTORS[v.origin]
             rear_x, rear_y = v.x - v.length_m * dx, v.y - v.length_m * dy

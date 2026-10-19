@@ -208,7 +208,7 @@ def render_config_tab() -> None:
     S["_dirty"] = dirty
 
     engine = S.get("engine")
-    run_locked = bool(engine is not None and engine.state in RUN_LOCKED_STATES
+    run_locked = bool(engine is not None and engine.has_started and engine.session_state in RUN_LOCKED_STATES
                       and S.run_config_snapshot and S.run_config_snapshot.get("id") == selected)
 
     # ---- Danh sách cấu hình ----

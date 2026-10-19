@@ -68,6 +68,9 @@ def init_session() -> None:
     S.engine = None
     S.run_config_snapshot = None
     S.summary_saved = False
+    S.run_id, S.started_at_iso = None, None
+    S.timer_epoch, S.timer_sequence = None, 0
+    S.history_outbox, S.history_saved_ids, S.history_attempted = {}, set(), set()
     S.pending_sim_reset = False
     S.sim_notice = None
     S.sel_box = None

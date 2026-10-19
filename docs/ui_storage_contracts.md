@@ -2,7 +2,9 @@
 
 Cập nhật Core 18–19: hình học xe 1.8m yêu cầu intersection_width_m>=3.6m,
 Config/JSON Schema đã đồng bộ; xem [core_day18_19.md](core_day18_19.md).
-UI/CSV và đề xuất DashboardData vẫn tách riêng, không được xem là đã tích hợp.
+Runtime tích hợp UI: xem [ui_core_integration.md](ui_core_integration.md).
+DashboardData đã có API chỉ đọc; UI dùng session_state/has_started và timer
+phát sự kiện riêng. Nội dung chuẩn bị Task 5 bên dưới có phần lịch sử.
 
 Cập nhật runtime đến 17/10: FileStorage/ConfigManager và regression tests đã có;
 xem [Storage implementation](storage_implementation.md). Các trạng thái chuẩn bị bên dưới là
@@ -109,17 +111,18 @@ phiên đã dừng, làm sạch selected_config_id/draft và yêu cầu chọn l
 
 | Control | Điều kiện enabled | Hành vi dự kiến |
 | --- | --- | --- |
-| Start | Chưa có engine hoặc phiên đã kết thúc; cấu hình đã lưu hợp lệ | Tạo run_id/Engine một lần từ bản sao cấu hình |
+| Start | Chưa có engine hoặc phiên đã kết thúc, có cấu hình lưu hợp lệ; hoặc engine chưa Start sau Reset | Phiên mới chốt cấu hình; sau Reset dùng lại Engine/bản chốt/seed |
 | Pause | RUNNING | engine.pause(), không tick |
-| Resume | PAUSED | engine.resume() |
+| Resume | PAUSED và has_started | engine.resume() |
 | Stop | RUNNING hoặc PAUSED | engine.stop(), chốt summary, ghi lịch sử qua Core/Storage |
 | Reset | PAUSED/STOPPED/COMPLETED/ERROR, có bản chốt | Xác nhận bỏ tiến độ; tạo lại theo cùng bản chốt/seed |
-| Step +1s | PAUSED | engine.run_ticks(1), một Poisson/tick và năm substep |
-| Chạy hết chu kỳ | PAUSED | Gọi public API tới ranh giới chu kỳ thực tế, kể cả hold |
+| Step +1s | PAUSED và has_started | engine.run_ticks(1), một Poisson/tick và năm substep |
+| Chạy hết chu kỳ | PAUSED và has_started | Gọi public API tới ranh giới chu kỳ thực tế, kể cả hold |
 | Xuất CSV | Có Summary/CycleMetric đã chốt | Core/Storage xuất; UI chỉ nhận nội dung tải xuống |
 
-Start khi PAUSED disabled, dùng Resume. Reset khi RUNNING disabled, yêu cầu
-Pause/Stop. **ĐỀ XUẤT THIẾT KẾ:** Reset dùng lại bản chốt hiện tại, tạo run_id mới;
+PAUSED đã Start dùng Resume. Sau Reset, PAUSED chưa Start thì bật Start, khóa
+Resume/Step/Chạy chu kỳ. Reset khi RUNNING disabled, yêu cầu Pause/Stop.
+Reset dùng lại bản chốt hiện tại, tạo run_id mới;
 muốn chạy cấu hình khác thì kết thúc phiên và Start mới. Không tự đổi seed khi reset.
 Khóa controls khi đang thực hiện lệnh để không double-click tạo hai Engine/run_id.
 Các trạng thái disabled được đánh giá từ Core; không dùng màu nút làm logic.
@@ -147,10 +150,12 @@ Renderer không đọc Lane.queue hay MovementEngine.active_crossing, không g�
 **Khoảng trống hợp đồng đã nhận diện:** Snapshot Task 4 chưa có green hiện tại/
 trước, chuỗi chart, số xe giao vùng xung đột, minimum gap thực đo hoặc Summary.
 Không tự sửa class/schema Task 4 để thêm các trường này trong Task 5.
-**ĐỀ XUẤT THIẾT KẾ:** Core cung cấp `DashboardData` chỉ đọc gồm snapshot, current/
+**Runtime:** Core cung cấp `DashboardData` chỉ đọc gồm snapshot, current/
 previous SignalPlan report, q_ns/q_ew, QueueSeries, CycleMetricSeries,
 conflict_occupancy_count, observed_min_gap_m hoặc None, SimulationSummary hoặc None.
-Đây là hợp đồng bổ sung để review, chưa tạo DTO hoặc implementation mới.
+Chi tiết tên trường và CycleMetrics tạm/đã chốt nằm trong ui_core_integration.md.
+Engine.summary() giữ dạng dict; UI/CSV ánh xạ qua báo cáo, không thêm alias state
+hoặc đổi API thống kê để khớp lời gọi cũ.
 
 | Vùng UI | Nguồn dữ liệu dự kiến |
 | --- | --- |
@@ -356,8 +361,10 @@ UI nhận dữ liệu xuất từ Storage, không tự mở/sửa CSV. Task 5 kh
 
 Widget change chỉ thay draft/lựa chọn, không gọi tick. Chỉ public action của Core
 làm đổi engine. Pause không tiến thời gian; Step một tick; tăng tốc chạy nhiều
-tick rồi vẽ, không đổi dt theo thời gian render. Chưa triển khai st.fragment/timer
-trong Task 5; ưu tiên Step/Chạy chu kỳ trước. Không dùng vòng while vô hạn ở UI.
+tick rồi vẽ, không đổi dt theo thời gian render. Runtime dùng component timer
+nội bộ, không tải script ngoài: sự kiện mang epoch/sequence; event trùng, cũ,
+khác epoch bị bỏ qua. Pause/Resume/Reset tạo hoặc tắt epoch có kiểm soát.
+Dashboard render không gọi tick. Không dùng vòng while vô hạn ở UI.
 
 ## 16. Test cases và kiểm tra đã thực hiện
 

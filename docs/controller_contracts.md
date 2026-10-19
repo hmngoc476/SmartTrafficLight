@@ -82,7 +82,10 @@ Queue mới, truyền cycle_no+1/started_at vào Controller và chỉ cập nh�
 sau activation thành công. Lỗi activation phải dừng ở ERROR an toàn.
 
 Engine thông báo Lane.reset_green_clock đúng một lần ở entry GREEN; tắt clock
-khi rời GREEN. Movement kết hợp signal, startup/headway, vị trí và FIFO.
+khi rời GREEN và giữ lịch sử crossing cuối của làn qua các pha/chu kỳ.
+Entry GREEN chờ cả `green_start + startup_delay_s` và
+`last_crossed_at + headway_s` (nếu đã có crossing). Reset toàn phiên mới xóa
+lịch sử. Movement kết hợp signal, startup/headway, vị trí và FIFO.
 Controller không trực tiếp sửa Lane. Pause giữ thời gian, Step tiến có kiểm soát
 và giữ PAUSED, Reset tạo lại RNG/plan/counters từ bản chốt Config.
 

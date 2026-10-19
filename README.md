@@ -157,11 +157,15 @@ Models không triển khai Poisson, Adaptive, Geometry, MovementEngine hoặc UI
   `peek()` xem đầu, `pop_crossed()` lấy đầu đã crossing; cả hai trả None khi rỗng.
   Pop khi đầu chưa crossing raise ValueError và giữ nguyên Queue.
   `get_vehicles()` trả tuple, `count()` đếm mọi xe còn trong Queue.
-- Controller gọi `reset_green_clock(started_at, startup_delay_s, headway_s)`
-  khi bắt đầu xanh: thời điểm đủ điều kiện đầu tiên là start + startup delay.
+- Engine gọi `reset_green_clock(started_at, startup_delay_s, headway_s)`
+  khi bắt đầu xanh: thời điểm đủ điều kiện là
+  `max(start + startup delay, crossing cuối cùng + headway)` nếu đã có crossing;
+  nếu chưa có thì dùng `start + startup delay`.
   Sau pop, đồng hồ kế tiếp là max(đồng hồ cũ, crossed_stop_t + headway).
   `is_cross_eligible(t)` chỉ kiểm tra đồng hồ và Queue, không cấp quyền qua đèn.
-  `reset_green_clock()` xóa clock khi kết thúc xanh; không xóa xe.
+  `reset_green_clock()` tắt clock khi kết thúc xanh; giữ xe và lịch sử crossing
+  qua vàng/đỏ, qua chu kỳ và cả khi Queue rỗng. Reset toàn phiên tạo Lane mới,
+  xóa lịch sử crossing.
 
 JSON khởi tạo dùng `{"schema_version": 2, "configs": []}` theo hợp đồng main.
 `Config.from_dict()` nhận một phần tử trong `configs`; `to_dict()` trả đúng

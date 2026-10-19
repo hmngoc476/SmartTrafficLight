@@ -49,6 +49,12 @@ bị clip bởi viewport UI. Ranh giới EXITED là mở: chạm biên chưa EXI
 - Xe mới chỉ crossing khi cuối substep>=arrival_t+1s (TC-23), đúng GREEN,
   là đầu FIFO, đủ startup/headway và tới s>=0. Xe initial không chịu thời
   gian chờ một giây của xe mới; vẫn chịu startup/headway/signal đầy đủ.
+- Headway áp dụng giữa hai crossing liên tiếp cùng làn trong toàn phiên,
+  kể cả khi chuyển pha/chu kỳ hoặc Queue đã rỗng rồi có xe mới. Lane giữ
+  crossing cuối qua vàng/đỏ. Khi vào xanh, đồng hồ đủ điều kiện là
+  `max(green_start + startup_delay_s, last_crossed_at + headway_s)`;
+  nếu chưa crossing thì chỉ dùng startup. Tắt clock khi rời xanh không
+  xóa lịch sử này; chỉ Reset toàn phiên tạo Lane mới và xóa lịch sử.
 - Crossing ghi t_sub+dt, pop FIFO đúng một lần và chuyển sang active dict.
   advance_substep trả tuple các crossing mới để Statistics không cộng lại
   mọi xe đã qua vạch ở những tick sau. EXITED tăng exit, không tăng crossing.
@@ -157,6 +163,9 @@ schema CSV lịch sử của UI.
   hold nhiều chu kỳ và Stop giữa chu kỳ.
 - test_comparison_day19.py: budget fixed, Tape bất biến, đúng arrivals từng
   tick/hướng, horizon qua giới hạn cycles, Reset replay và ERROR không comparable.
+- test_headway_across_cycles.py: headway 13s/100s qua nhiều chu kỳ ở cả bốn
+  làn và cả hai policy; Reset xóa lịch sử; replay ca đối chứng 48s xác nhận
+  từng crossing đủ headway trước khi đối chiếu kết quả runner.
 - test_simulation_day17.py giữ kiểm tra nền. Fixture crossing một lần nay dùng
   xe initial thay xe mới để không mâu thuẫn TC-23; vị trí/timestamp kỳ vọng vẫn giữ.
 

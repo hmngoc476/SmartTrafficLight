@@ -101,6 +101,32 @@ def test_startup_headway_and_reset():
     assert lane.peek() is b
 
 
+@pytest.mark.parametrize('direction', 'NSEW')
+@pytest.mark.parametrize('green_start,startup,expected', [
+    (24, 0, 27.6),  # Headway từ pha trước vẫn chưa hết.
+    (24, 6, 30),    # Startup của pha mới kết thúc muộn hơn headway.
+    (30, 0, 30),    # Headway đã hết trong khoảng đỏ.
+])
+def test_new_green_keeps_last_crossing_even_after_empty_queue(direction, green_start, startup, expected):
+    lane = Lane(direction)
+    first = Vehicle('first', direction, s_front_m=0)
+    lane.enqueue(first)
+    lane.reset_green_clock(0, startup_delay_s=0, headway_s=13)
+    first.mark_crossed(14.6)
+    assert lane.pop_crossed() is first
+    assert lane.count() == 0
+
+    lane.reset_green_clock()
+    lane.reset_green_clock()  # Tắt clock nhiều lần không được xóa lịch sử.
+    lane.enqueue(Vehicle('next', direction, arrival_t=20))
+    assert not lane.is_cross_eligible(100)
+
+    lane.reset_green_clock(green_start, startup_delay_s=startup, headway_s=13)
+    assert lane.next_cross_eligible_at == pytest.approx(expected)
+    assert not lane.is_cross_eligible(expected - .01)
+    assert lane.is_cross_eligible(expected)
+
+
 @pytest.mark.parametrize('args', [(-1, 0, 1), (1, -1, 1), (1, 0, 0), (True, 0, 1), (float('inf'), 0, 1)])
 def test_bad_clock_is_atomic(args):
     lane = Lane('N')

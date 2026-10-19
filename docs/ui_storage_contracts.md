@@ -1,5 +1,13 @@
 # Hợp đồng UI và Storage Task 5
 
+Cập nhật Core 18–19: hình học xe 1.8m yêu cầu intersection_width_m>=3.6m,
+Config/JSON Schema đã đồng bộ; xem [core_day18_19.md](core_day18_19.md).
+UI/CSV và đề xuất DashboardData vẫn tách riêng, không được xem là đã tích hợp.
+
+Cập nhật runtime đến 17/10: FileStorage/ConfigManager và regression tests đã có;
+xem [Storage implementation](storage_implementation.md). Các trạng thái chuẩn bị bên dưới là
+lịch sử Task 5, không phải kết quả chạy test hiện tại. UI/CSV vẫn là phần riêng.
+
 ## 1. Mục tiêu và phạm vi
 
 Mốc kế hoạch **12/10/2026**, thực hiện **13/10/2026**. Chốt wireframe desktop
@@ -156,7 +164,7 @@ conflict_occupancy_count, observed_min_gap_m hoặc None, SimulationSummary ho�
 | Cuối phiên / CSV | SimulationSummary và nội dung xuất từ Storage |
 
 Thiếu báo cáo thì hiện “Chưa có dữ liệu”, không tạo số 0 hoặc chart giả. Min Gap
-cấu hình và gap thực đo có nhãn khác nhau; width xe chưa chốt không được suy ra từ
+cấu hình và gap thực đo có nhãn khác nhau; width xe vật lý 1.8m đã chốt, không được suy ra từ
 kích thước biểu tượng UI. clearance_hold_s trong Task 4 metrics là **chu kỳ hiện
 tại**, còn CSV summary là **tổng phiên**, phải được Core tổng hợp đúng scope.
 Tên avg_wait_departed_s giữ legacy nhưng UI ghi “Thời gian từ xuất hiện tới vượt
@@ -211,7 +219,7 @@ tùy chọn khi đọc file. Integer khi gọi Core phải là int Python, khôn
 | motion_2d.max_speed_mps | number | m/s tốc độ tối đa | 9.0; >0 |
 | motion_2d.accel_mps2 | number | m/s² gia tốc | 2.0; >0 |
 | motion_2d.approach_visible_m | number | Mét đường tiếp cận hiển thị | 60.0; >0 |
-| motion_2d.intersection_width_m | number | Mét bề rộng giao lộ | 16.0; >0 |
+| motion_2d.intersection_width_m | number | Mét bề rộng giao lộ | 16.0; >=3.6 (hai làn xe 1.8m đã chốt) |
 | motion_2d.stop_margin_m | number | Mét chừa trước vạch | 0.5; >=0 |
 | motion_2d.clearance_limit_s | number | Giây hold tối đa trước ERROR | 30; >0, hữu hạn |
 
@@ -238,7 +246,7 @@ kiểm tra int Python tại các trường integer và không tự ép kiểu fl
 **ĐỀ XUẤT THIẾT KẾ tolerance:** `n=round(1/dt_s)` phải >=1 và
 `abs(1/dt_s - n) <= 1e-9`, sau khi kiểm tra dt/reciprocal hữu hạn. 0.2 →5,
 1 →1, 1/3 gần đúng →3; 0.3 bị từ chối. Không hard-code chỉ chấp nhận dt=0.2.
-Không thêm ngưỡng tối đa mới cho các thông số mà tài liệu không quy định.
+Không thêm ngưỡng tối đa tùy ý. Riêng width>=3.6m là điều kiện hình học từ bề rộng xe 1.8m đã chốt, không phải giới hạn 4m cũ của offset cố định.
 Motion disabled vẫn lưu/validate đủ tham số để bật lại không mang dữ liệu hỏng.
 
 UniqueItems không bảo đảm configs[*].id duy nhất khi hai object khác name.

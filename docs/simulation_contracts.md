@@ -1,6 +1,20 @@
 # Hợp đồng hình học 2D và SimulationSnapshot
 
+Cập nhật 18–19: xem [core_day18_19.md](core_day18_19.md). Các quyết định dưới đây
+về width/hình bao/biên đã được hiện thực; bảng Task 4 còn lại là lịch sử.
+
+Cập nhật đến 17/10: hai engine, Controller và Statistics đã hiện thực trên
+feat/simulation; xem [hợp đồng runtime ngày 17](simulation_day17.md) và
+[hợp đồng Controller](controller_contracts.md). Các trạng thái Task 4 bên dưới
+ghi lại mốc thiết kế trước implementation; ví dụ JSON vẫn là fixture tĩnh.
+
 ## 1. Mục tiêu và phạm vi Task 4
+
+**Quyết định interface nhóm ngày 15/10/2026:** trực tiếp gọi
+`geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)` khi cần tọa độ.
+Bỏ `Vehicle.to_xy()` và hàm độc lập `core.geometry.to_xy()`. Đây là
+**điều chỉnh public API so với thiết kế V2.3 gốc**, không thay đổi toán học
+hình học V2.3. Các nhánh Models/Simulation/UI phải nhận cập nhật này.
 
 Task 4 thuộc mốc thiết kế **12/10/2026**, được thực hiện ngày **13/10/2026**.
 Chốt tọa độ N/S/E/W, Geometry, snapshot chỉ đọc và dữ liệu mẫu để nhóm UI có
@@ -58,7 +72,7 @@ engine chỉ ghi crossing khi GREEN, startup delay/headway hợp lệ và xe là
 `crossed_stop_t` là căn cứ sự kiện đã xảy ra. Tại đúng s=0, ownership tùy sự kiện,
 không suy ra chỉ từ tọa độ; trong snapshot biểu diễn bằng motion_state.
 Khởi tạo hàng chờ ở s=-stop_margin_m, không tự đánh dấu crossing ở lúc enqueue.
-Hàm `to_xy` không xét đèn hoặc thay đổi trạng thái crossing.
+Phương thức `Geometry.lane_to_xy()` không xét đèn hoặc thay đổi trạng thái crossing.
 
 ## 5. Công thức ánh xạ
 
@@ -127,18 +141,18 @@ không mở rộng vùng lần nữa nếu đã dùng AABB đầy đủ của xe
 Ví dụ N có đầu (-2, 10), dài 4,5m thì đuôi (-2, 5.5) vẫn trong vùng:
 đầu xe ra khỏi vùng chưa đủ để cấp xanh đối diện.
 
-**Bề rộng chưa có trong cấu hình V2.3.** Geometry giữ `vehicle_width_m=None`,
-không âm thầm dùng chiều rộng chuẩn. Nhóm có thể chọn 1,8m như một tham số minh
-họa bổ sung, nhưng phải xác nhận và ghi vào cấu hình trước khi hiện thực occupancy.
-Đề xuất engine từ chối chạy clearance vật lý khi thiếu width; không trả True
-cho `is_conflict_clear()` chỉ vì thiếu thông tin. Width hiển thị bằng pixel
-trong UI không được xem là kích thước vật lý của xe.
+**Bề rộng vật lý đã chốt 1,8m ngày 19/10/2026.** Geometry() giữ default
+None cho metadata/API lịch sử; Geometry.for_motion(motion) truyền rõ 1.8m vào
+Core và Snapshot. Không thêm key JSON V2. Giao lộ phải >=3.6m để đủ hai làn;
+offset=min(2m, width/4), đảm bảo thân xe nằm trong phần đường mỗi hướng.
+Config và JSON Schema được đồng bộ miền này. Thiếu width thì kiểm tra hình
+bao báo lỗi, không tự coi vùng trống. Không lấy bề rộng biểu tượng UI làm vật lý.
 
-Occupancy/AABB/clearance hiện **chưa có implementation**. `is_conflict_clear()`
-tương lai chỉ True nếu mọi xe active_crossing đều không giao vùng xung đột;
-xe còn trong active_crossing nhưng đã ra khỏi vùng không giữ đỏ nữa.
+Movement.is_conflict_clear chỉ True khi mọi hình bao active đã ra khỏi vùng đóng.
+Xe active đã qua vùng nhưng chưa EXITED không giữ đỏ. Test vật lý ở
+`tests/test_physics_day18.py` và thí nghiệm cùng horizon đã thực thi.
 
-## 8. Hợp đồng Geometry và to_xy
+## 8. Hợp đồng Geometry.lane_to_xy
 
 Các public API đã hiện thực:
 
@@ -147,12 +161,12 @@ Geometry(...)                         # frozen dataclass, đơn vị mét
 geometry.stop_point(direction) -> tuple[float, float]
 geometry.conflict_bounds              # tuple[float, float, float, float]
 geometry.to_snapshot() -> GeometrySnapshot
-to_xy(direction: str, s_front_m: float, geometry: Geometry) -> tuple[float, float]
+geometry.lane_to_xy(origin: str, s_front_m: float) -> tuple[float, float]
 ```
 
 Direction chỉ nhận N/S/E/W; "X", chữ thường và giá trị thiếu gây ValueError.
 s nhận int/float hữu hạn, không nhận bool; kiểu sai gây TypeError, NaN/inf gây
-ValueError. geometry phải là Geometry. Kết quả là tuple hai float bằng mét.
+ValueError. Gọi trực tiếp trên đối tượng Geometry. Kết quả là tuple hai float bằng mét.
 Hàm thuần: cùng đầu vào cho cùng kết quả, không đổi s, Vehicle, Queue, tín hiệu
 hoặc viewport. Geometry không sinh Poisson, tính xanh, điều khiển đèn hay ghi file.
 
@@ -165,9 +179,10 @@ Ví dụ cho Geometry mặc định (**tọa độ minh họa được đề xu�
 | E | (8,-2) | y=-2 | (18,-2) | (8,-2) | (-2,-2) |
 | W | (-8,2) | y=2 | (-18,2) | (-8,2) | (2,2) |
 
-Khi width=20, offset=3, `to_xy("N", -4, geometry)` = (-3,-14).
-Chỉ có một implementation chuyển tọa độ; Vehicle/MovementEngine tương lai gọi
-hàm này hoặc tạo wrapper mỏng, không sao chép bốn công thức ở các module.
+Khi width=20, offset=3, `geometry.lane_to_xy("N", -4)` = (-3,-14).
+Chỉ có một implementation chuyển tọa độ. Core/MovementEngine gọi trực tiếp
+`geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m)`; Vehicle không chứa
+`to_xy()` hay công thức hình học. Không duy trì wrapper thứ hai.
 
 ## 9. SimulationSnapshot và nguồn định nghĩa
 
@@ -229,7 +244,7 @@ Các mapping màu/counters được chép thành dict mới, kiểm tra leaf là
 scalar hợp lệ và bọc MappingProxyType. Frozen đơn thuần không đủ cho dict/list.
 
 UI không nhận Lane.queue hay active_crossing; không sửa Vehicle thực tế, timer,
-không gọi popleft và không sửa state/time của engine. Builder tương lai đọc
+không gọi popleft và không sửa state/time của engine. Builder của SimulationEngine đọc
 scalar từ Core rồi tạo DTO; không gắn đối tượng nghiệp vụ vào một trường mới.
 
 `snapshot.to_dict()` tạo dict/list JSON mới, có thể sửa để phục vụ UI mà không
@@ -262,7 +277,7 @@ Khi đuôi xe vượt giới hạn thế giới hiển thị, ghi exited_world_t
 tăng exited_world_total, không tăng crossed lần hai. **ĐỀ XUẤT THIẾT KẾ:** viewport
 đối xứng có biên ±(width/2 + approach_visible_m), mặc định ±68m; renderer clip
 xe ngoài viewport nhưng không tự thực hiện EXITED. Xe Queue ngoài viewport vẫn
-có trong snapshot và counters. Quy tắc EXITED do MovementEngine xử lý tương lai.
+có trong snapshot và counters. Movement đã kiểm tra đuôi xe theo đúng tọa độ thế giới ở cả bốn hướng (test ngày 18).
 
 ## 13. min_gap, tín hiệu, clearance và nhịp thời gian
 
@@ -279,7 +294,7 @@ Xe đã crossing bỏ stop_limit và tiếp tục đi ra khỏi vùng, kể cả
 Khi ALL_RED hết danh định mà vùng còn chiếm, giữ đỏ từng tick và tăng
 clearance_hold_s. Chỉ cấp GREEN đối diện khi vùng trống. Quá clearance_limit_s
 thì ERROR và giữ tất cả đỏ; không cưỡng bức xanh. Hold không làm đổi green_budget
-hoặc min_green. Những ràng buộc này **mới được đặc tả**, chưa có code điều khiển.
+hoặc min_green. Những ràng buộc này đã có code điều khiển và test ngày 18; xem tài liệu Core mới.
 
 Một tick logic 1 giây gồm 5 substep × 0,2 giây. Poisson gọi một lần mỗi hướng
 mỗi tick, không gọi lại trong substep hoặc khi UI rerun. Pause không chạy tick;
@@ -312,11 +327,11 @@ không có xe cùng lúc ở Queue và active. Snapshot chưa chứng minh lịc
 
 | Mã | Tình huống / expected | Trạng thái phạm vi Task 4 |
 | --- | --- | --- |
-| G-01 | N: s âm phía Bắc vạch; s tăng làm y tăng | Test implementation to_xy |
-| G-02 | S: s âm phía Nam vạch; s tăng làm y giảm | Test implementation to_xy |
-| G-03 | E: s âm phía Đông vạch; s tăng làm x giảm | Test implementation to_xy |
-| G-04 | W: s âm phía Tây vạch; s tăng làm x tăng | Test implementation to_xy |
-| G-05 | direction X → ValueError | Test implementation to_xy |
+| G-01 | N: s âm phía Bắc vạch; s tăng làm y tăng | Test Geometry.lane_to_xy |
+| G-02 | S: s âm phía Nam vạch; s tăng làm y giảm | Test Geometry.lane_to_xy |
+| G-03 | E: s âm phía Đông vạch; s tăng làm x giảm | Test Geometry.lane_to_xy |
+| G-04 | W: s âm phía Tây vạch; s tăng làm x tăng | Test Geometry.lane_to_xy |
+| G-05 | direction X → ValueError | Test Geometry.lane_to_xy |
 | G-06 | Sửa field, tuple, mapping bị chặn; sửa input/export không đổi DTO | Test DTO đã hiện thực, không phải engine |
 | G-07 | ID trùng → ValueError | Test DTO đã hiện thực |
 | G-08 | Queue/active rời nhau, counters khớp mẫu | Test dữ liệu mẫu đã hiện thực |
@@ -327,8 +342,8 @@ không có xe cùng lúc ở Queue và active. Snapshot chưa chứng minh lịc
 | G-11 | JSON hợp lệ, schema và kiểu đúng, roundtrip không mất dữ liệu | Test DTO đã hiện thực |
 | G-12 | Geometry width=20, offset=3; N s=-4 →(-3,-14) | Test không hard-code hình mẫu |
 | G-13 | s NaN/inf, kiểu sai; Geometry âm/zero không hợp lệ | Test validation đã hiện thực |
-| G-14 | Đầu xe ra vùng, đuôi còn trong vùng → không clear | **CHƯA THỰC THI**, cần AABB/width |
-| G-15 | ALL_RED hold khi vùng chưa trống, timeout giữ ERROR/all-red | **CHƯA THỰC THI**, cần controller/engine |
+| G-14 | Đầu xe ra vùng, đuôi còn trong vùng → không clear | Đã có test vật lý ngày 18 (xem core_day18_19.md) |
+| G-15 | ALL_RED hold khi vùng chưa trống, timeout giữ ERROR/all-red | Đã có test Controller/Engine ngày 18 |
 | G-16 | Pause đứng yên, Step một lần Poisson + năm substep | **CHƯA THỰC THI**, cần engine |
 
 Test tương lai chỉ được ghi expected trong tài liệu, chưa được tính PASS hoặc
@@ -353,7 +368,7 @@ Trên checkout sạch, dùng lệnh pytest thông thường. Không xóa bản c
 - Review **ĐỀ XUẤT THIẾT KẾ**: offset 2m, vạch tại biên giao lộ, viewport ±68m,
   bề rộng xe cần bổ sung, schema snapshot v1 và các field/enum cụ thể.
 - Hiện thực Vehicle/Lane và builder đọc scalar để tạo DTO; cập nhật x/y bằng
-  to_xy duy nhất. Đảm bảo snapshot đồng bộ và không lộ tham chiếu mutable Core.
+  Geometry.lane_to_xy duy nhất. Đảm bảo snapshot đồng bộ và không lộ tham chiếu mutable Core.
 - Hiện thực MovementEngine: front→back, gia tốc, stop_limit, gap, startup/headway,
   CrossingEvent/ExitedEvent đúng một lần; thêm test G-08/G-09 động.
 - Chốt width rồi hiện thực AABB, is_conflict_clear và clearance hold/timeout.
@@ -363,5 +378,5 @@ Trên checkout sạch, dùng lệnh pytest thông thường. Không xóa bản c
   không dùng JSON mẫu để giả vờ đang chạy mô phỏng thực.
 - Chạy test tích hợp trạng thái, gap, clearance, Pause/Step/Reset và bảo toàn xe.
 
-Phần cần nhóm xác nhận được đánh dấu rõ; chưa có quyết định nào về bề rộng xe
-được coi là thông số chính thức của V2.3. Hai engine vẫn ở trạng thái TODO.
+Danh sách trên là kế hoạch lịch sử. Bề rộng 1.8m đã được người dùng chốt;
+trạng thái hiện tại và API mới nằm trong core_day18_19.md.

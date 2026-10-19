@@ -8,7 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.core.geometry import DIRECTION_VECTORS, Geometry, to_xy
+from src.core.geometry import DIRECTION_VECTORS, Geometry
+from src.models.vehicle import Vehicle
 
 
 @pytest.mark.parametrize(
@@ -22,9 +23,9 @@ from src.core.geometry import DIRECTION_VECTORS, Geometry, to_xy
 )
 def test_four_direction_coordinates(direction, stop, before, after):
     geometry = Geometry()
-    assert to_xy(direction, -10, geometry) == before
-    assert to_xy(direction, 0, geometry) == stop
-    assert to_xy(direction, 10, geometry) == after
+    assert geometry.lane_to_xy(direction, -10) == before
+    assert geometry.lane_to_xy(direction, 0) == stop
+    assert geometry.lane_to_xy(direction, 10) == after
     dx, dy = DIRECTION_VECTORS[direction]
     assert after == pytest.approx((before[0] + 20 * dx, before[1] + 20 * dy))
 
@@ -32,13 +33,13 @@ def test_four_direction_coordinates(direction, stop, before, after):
 @pytest.mark.parametrize("direction", ["X", "n", "", None])
 def test_g05_invalid_direction(direction):
     with pytest.raises(ValueError):
-        to_xy(direction, 0, Geometry())
+        Geometry().lane_to_xy(direction, 0)
 
 
 def test_configured_geometry_and_purity():
     geometry = Geometry(intersection_width_m=20, lane_offset_m=3)
-    assert to_xy("N", -4, geometry) == (-3.0, -14.0)
-    assert to_xy("N", -4, geometry) == to_xy("N", -4, geometry)
+    assert geometry.lane_to_xy("N", -4) == (-3.0, -14.0)
+    assert geometry.lane_to_xy("N", -4) == geometry.lane_to_xy("N", -4)
     assert geometry.conflict_bounds == (-10.0, -10.0, 10.0, 10.0)
     assert geometry.to_snapshot().lane_offset_m == 3.0
     with pytest.raises(FrozenInstanceError):
@@ -48,13 +49,13 @@ def test_configured_geometry_and_purity():
 @pytest.mark.parametrize("position", [float("nan"), float("inf"), -float("inf")])
 def test_nonfinite_position(position):
     with pytest.raises(ValueError):
-        to_xy("N", position, Geometry())
+        Geometry().lane_to_xy("N", position)
 
 
 @pytest.mark.parametrize("position", [True, "1", None])
 def test_invalid_position_type(position):
     with pytest.raises(TypeError):
-        to_xy("N", position, Geometry())
+        Geometry().lane_to_xy("N", position)
 
 
 @pytest.mark.parametrize(
@@ -73,3 +74,29 @@ def test_invalid_position_type(position):
 def test_invalid_geometry_values(parameters):
     with pytest.raises(ValueError):
         Geometry(**parameters)
+
+
+@pytest.mark.parametrize(
+    "direction,stop,before,after",
+    [
+        ("N", (-2.0, -8.0), (-2.0, -18.0), (-2.0, 2.0)),
+        ("S", (2.0, 8.0), (2.0, 18.0), (2.0, -2.0)),
+        ("E", (8.0, -2.0), (18.0, -2.0), (-2.0, -2.0)),
+        ("W", (-8.0, 2.0), (-18.0, 2.0), (2.0, 2.0)),
+    ],
+)
+def test_real_vehicle_passes_coordinates_directly_to_real_geometry(direction, stop, before, after):
+    """Integration: một API tính tọa độ; không còn Vehicle.to_xy wrapper."""
+    geometry = Geometry()
+    vehicle = Vehicle(f"V-{direction}", direction, s_front_m=-10)
+    assert not hasattr(vehicle, "to_xy")
+    assert geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m) == before
+
+    vehicle.update_motion(0, 1)
+    assert geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m) == stop
+
+    vehicle.mark_crossed(1)
+    vehicle.update_motion(10, 2)
+    assert geometry.lane_to_xy(vehicle.origin, vehicle.s_front_m) == after
+    assert vehicle.origin == direction
+    assert vehicle.s_front_m == 10

@@ -5,7 +5,7 @@
 Chốt interface và quy tắc kiểm thử ngày **12/10/2026** để thành viên hiện thực
 thuật toán ngày **15/10/2026** có thể sử dụng cùng một hợp đồng. Tài liệu này
 đặc tả hành vi cần đạt. Poisson và Adaptive hiện đã có implementation và kiểm thử;
-Config dùng thời lượng kiểu int để gọi Adaptive. Tích hợp engine chưa triển khai.
+Config dùng thời lượng kiểu int để gọi Adaptive. Engine đã tích hợp; Fixed-Time/replay ngày 19 được mô tả tại [core_day18_19.md](core_day18_19.md).
 Các bảng trạng thái chuẩn bị bên dưới ghi lại mốc thiết kế 12/10/2026;
 kết quả kiểm thử hiện tại phải lấy từ lần chạy pytest thực tế.
 
@@ -241,7 +241,8 @@ cả hai đạt tối thiểu 10. Không dùng công thức phân phối `budget
    Không sinh lại xe ở từng substep chuyển động 0,2 giây.
 3. Khi bắt đầu một chu kỳ (kể cả chu kỳ đầu), lấy snapshot độ dài bốn deque;
    q_ns = len(Q_N) + len(Q_S), q_ew = len(Q_E) + len(Q_W).
-4. Gọi Adaptive và dùng tuple để lập SignalPlan. Giữ nguyên các thời lượng
+4. Engine truyền counts/cycle_no/started_at cho Controller.start_next_cycle.
+   Controller gọi Adaptive và dùng tuple để lập SignalPlan. Giữ nguyên các thời lượng
    trong toàn chu kỳ; chỉ đọc snapshot và phân bổ lại ở chu kỳ tiếp theo.
 5. Thời gian vàng, all-red và clearance hold thuộc controller/movement;
    không cộng vào green_budget. Xe đã vượt vạch thuộc active_crossing và

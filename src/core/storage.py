@@ -9,7 +9,8 @@ from threading import Lock, RLock
 
 from src.models.config import Config
 
-json_path = Path('data/junctions.json')
+# Resolve from the project root so launching from src does not create src/data.
+json_path = Path(__file__).resolve().parents[2] / 'data' / 'junctions.json'
 _locks_guard = Lock()
 _path_locks: dict[Path, RLock] = {}
 

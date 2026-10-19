@@ -32,9 +32,15 @@ def test_packages_import():
             importlib.import_module(f"src.{package}.{module}")
 
 
-def test_sample_json():
-    data = json.loads((ROOT / "data/junctions.json").read_text(encoding="utf-8"))
-    assert data == {"schema_version": 2, "configs": []}
+def test_runtime_json_is_valid_and_preserved():
+    from src.core.storage import FileStorage
+
+    path = ROOT / "data/junctions.json"
+    original = path.read_bytes()
+    data = json.loads(original)
+    # Runtime storage may contain saved configs; empty initialization is tested separately.
+    assert FileStorage.load_configs(path) == data["configs"]
+    assert path.read_bytes() == original
 
 
 def test_uv_metadata():

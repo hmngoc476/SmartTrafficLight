@@ -59,6 +59,9 @@ def reload_data() -> None:
 
 def init_session() -> None:
     if "manager" in S:
+        # Hỗ trợ phiên Streamlit đã mở trước khi triển khai nút áp dụng cấu hình mới.
+        if "pending_new_config" not in S:
+            S.pending_new_config = False
         return
     S.use_config_id = None
     S.selected_config_id = None
@@ -72,6 +75,7 @@ def init_session() -> None:
     S.timer_epoch, S.timer_sequence = None, 0
     S.history_outbox, S.history_saved_ids, S.history_attempted = {}, set(), set()
     S.pending_sim_reset = False
+    S.pending_new_config = False
     S.sim_notice = None
     S.sel_box = None
     reload_data()

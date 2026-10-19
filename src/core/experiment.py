@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 from statistics import mean, pstdev
+import sys
 
 from src.core.comparison import compare_policies
 from src.models.config import Config, Motion2DConfig
@@ -57,6 +58,8 @@ def main():
     result = run_experiment(scenarios(), args.seeds, args.horizon)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2), encoding='utf-8')
+    # Windows redirected output may use a legacy encoding without Vietnamese glyphs.
+    sys.stdout.reconfigure(errors='backslashreplace')
     print(f"{len(result['records'])} cặp chạy; báo cáo: {args.output}")
 
 

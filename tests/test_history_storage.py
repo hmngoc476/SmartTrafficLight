@@ -40,9 +40,10 @@ def test_written_headers_match_markdown_and_real_statistics(report, tmp_path):
     assert cycles[-1].provisional
     assert save(report, tmp_path)
     expected = re.findall(r'```text\n([^`]+)\n```',
-                          (Path(__file__).resolve().parents[1]/'docs/ui_storage_contracts.md').read_text())
+                          (Path(__file__).resolve().parents[1]/'docs/ui_storage_contracts.md').read_text(encoding='utf-8'))
+    assert len(expected) == 2
     for filename, header in zip(('history.csv','cycles.csv'), expected):
-        with (tmp_path/filename).open(newline='') as f:
+        with (tmp_path/filename).open(encoding='utf-8', newline='') as f:
             assert next(csv.reader(f)) == header.split(',')
     history = read(tmp_path/'history.csv')
     records = read(tmp_path/'cycles.csv')

@@ -4,6 +4,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from collections import Counter
 from dataclasses import FrozenInstanceError
+import json
+import os
+import subprocess
 import pytest
 from src.core.algorithms import allocate_green_fixed
 from src.core.arrivals import ArrivalTape
@@ -103,6 +106,25 @@ def test_aggregate_only_comparable_pairs_and_preserves_absent_wait():
         assert a['comparable_pairs'] == 3
         assert a['metrics']['departed_vehicles'] == dict(samples=3,mean=0,population_std=0)
         assert a['metrics']['avg_wait_departed_s'] == dict(samples=0,mean=None,population_std=None)
+
+
+@pytest.mark.parametrize('encoding', ['utf-8', 'cp1252'])
+def test_experiment_cli_exports_report_with_unicode_path(tmp_path, encoding):
+    output = tmp_path / 'báo-cáo.json'
+    result = subprocess.run(
+        [sys.executable, '-m', 'src.core.experiment', '--horizon', '1',
+         '--seeds', '0', '--output', str(output)],
+        cwd=Path(__file__).resolve().parents[1],
+        env=dict(os.environ, PYTHONIOENCODING=encoding),
+        capture_output=True, text=True, encoding=encoding, timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith('6 ')
+    report = json.loads(output.read_text(encoding='utf-8'))
+    assert report['horizon_s'] == 1
+    assert len(report['records']) == 6
+    assert all(record['comparable'] for record in report['records'])
 
 
 @pytest.mark.parametrize('kwargs', [dict(policy='unknown'),dict(horizon_s=0),

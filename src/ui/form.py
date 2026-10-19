@@ -82,7 +82,6 @@ def explain_error(message: str) -> tuple[str | None, str]:
         return f"rate_{d}", f"Lưu lượng {d} phải là số hữu hạn từ 0 đến 30 xe/phút."
     if text.startswith("initial_queue.") and len(text) > 14:
         d = text[14]
-        d = text[14]
         return f"queue_{d}", f"Số xe ban đầu hướng {d} phải là số nguyên từ 0 đến 100."
     if text.startswith("name"):
         return "name", "Vui lòng nhập tên cấu hình."

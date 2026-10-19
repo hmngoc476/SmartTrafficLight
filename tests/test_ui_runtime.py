@@ -1,5 +1,6 @@
 """Real Streamlit tabs, real Core and temporary JSON/CSV storage."""
 from pathlib import Path
+from functools import partial
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -7,6 +8,8 @@ import json
 import pytest
 from streamlit.testing.v1 import AppTest
 from src.core import history_storage
+from src.core.manager import ConfigManager
+from src.ui import state
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(state, 'ConfigManager', partial(ConfigManager, tmp_path/'data/junctions.json'))
     monkeypatch.setattr(history_storage, 'HISTORY_PATH', tmp_path/'data/sim_history.csv')
     monkeypatch.setattr(history_storage, 'CYCLES_PATH', tmp_path/'data/cycle_metrics.csv')
     at = AppTest.from_file(str(ROOT/'src/app.py'), default_timeout=30).run()
@@ -93,6 +97,67 @@ def test_widget_reruns_do_not_tick_and_reset_replays_original_config(app):
         at.button(key='sim_step').click().run()
     assert engine.snapshot().to_dict() == before
     assert engine.controller.config.headway_s == 2
+    assert not at.exception
+
+
+def test_updating_cycles_from_10_to_3_creates_a_new_run_only_after_confirmation(app):
+    """Regression: Tab 1 saved=3, paused run=10 -> explicit new run=3."""
+    at = app
+    create_config(at, cycles=10, queue={})
+    cfg_id = at.session_state['selected_config_id']
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    old_engine = at.session_state['engine']
+    old_run_id = at.session_state['run_id']
+    assert old_engine.session_state == 'PAUSED'
+    assert at.session_state['run_config_snapshot']['cycles_to_run'] == 10
+
+    at.number_input(key='f_cycles_to_run').set_value(3).run()
+    at.button(key='btn_update').click().run()
+    assert at.session_state['manager'].get(cfg_id)['cycles_to_run'] == 3
+    # Save không được âm thầm làm thay đổi kết quả/snapshot của phiên cũ.
+    assert old_engine.cycle_index == 1
+    assert at.session_state['run_config_snapshot']['cycles_to_run'] == 10
+    assert any('vẫn dùng 10 chu kỳ' in w.value for w in at.warning)
+
+    at.button(key='sim_apply_new_config').click().run()
+    at.button(key='sim_apply_new_config_confirm').click().run()
+    assert not at.exception
+    new_engine = at.session_state['engine']
+    assert new_engine is not old_engine
+    assert old_engine.session_state == 'STOPPED'
+    assert new_engine.session_state == 'RUNNING'
+    assert at.session_state['run_id'] != old_run_id
+    assert at.session_state['run_config_snapshot']['cycles_to_run'] == 3
+    assert new_engine.controller.config.cycles_to_run == 3
+    assert new_engine.snapshot().cycle_index == 1
+    assert not at.warning
+
+    at.button(key='sim_pause').click().run()
+    for _ in range(3):
+        at.button(key='sim_cycle').click().run()
+    assert new_engine.session_state == 'COMPLETED'
+    assert new_engine.cycle_index == 3
+    assert at.session_state['summary_saved']
+    assert not at.exception
+
+
+def test_reset_keeps_old_config_until_user_explicitly_applies_new_one(app):
+    at = app
+    create_config(at, cycles=10, queue={})
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    at.number_input(key='f_cycles_to_run').set_value(3).run()
+    at.button(key='btn_update').click().run()
+    at.button(key='sim_reset').click().run()
+    at.button(key='sim_reset_confirm').click().run()
+    at.button(key='sim_start').click().run()
+    assert at.session_state['run_config_snapshot']['cycles_to_run'] == 10
+    at.button(key='sim_pause').click().run()
+    at.button(key='sim_apply_new_config').click().run()
+    at.button(key='sim_apply_new_config_confirm').click().run()
+    assert at.session_state['run_config_snapshot']['cycles_to_run'] == 3
+    assert at.session_state['engine'].controller.config.cycles_to_run == 3
     assert not at.exception
 
 

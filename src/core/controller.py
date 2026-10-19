@@ -13,7 +13,6 @@ Chức năng:
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
 
 from src.core import algorithms
 from src.models.config import Config, integer

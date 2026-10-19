@@ -38,21 +38,63 @@ def _run(action, *args) -> bool:
         return False
 
 
+def _selected_saved_config() -> dict | None:
+    """Bản cấu hình đã LƯU để tạo phiên mới (không lấy form chưa lưu)."""
+    return state.get_config(S.use_config_id or S.selected_config_id)
+
+
+def _activate_run(engine: SimulationEngine, data: dict, *, new_run: bool) -> None:
+    """Chốt cấu hình và bắt đầu. Chỉ tạo run_id mới khi tạo Engine mới."""
+    engine.start()
+    S.engine, S.run_config_snapshot = engine, data
+    if new_run:
+        S.run_id = uuid4().hex
+    S.summary_saved, S.pending_sim_reset, S.pending_new_config = False, False, False
+    S.started_at_iso = datetime.now(timezone.utc).isoformat()
+    S.timer_epoch, S.timer_sequence = uuid4().hex, 0
+
+
 def on_start() -> None:
     def go() -> None:
         if S.engine is not None and not S.engine.has_started:
+            # Sau Reset, Start phát lại ĐÚNG bản chốt cũ (contract về seed/replay).
+            # Muốn dùng cấu hình vừa sửa phải chọn 'Áp dụng cấu hình mới'.
             engine, data = S.engine, S.run_config_snapshot
+            _activate_run(engine, data, new_run=False)
         else:
-            data = state.get_config(S.use_config_id or S.selected_config_id)
+            data = _selected_saved_config()
             if data is None:
                 raise RuntimeError("Chưa có cấu hình hợp lệ để chạy; chọn hoặc tạo ở Tab 1.")
-            engine = SimulationEngine(Config.from_dict(data))
-            S.run_id = uuid4().hex
-        engine.start()
-        S.engine, S.run_config_snapshot = engine, data   # bản chốt, không đổi khi sửa Tab 1
-        S.summary_saved, S.pending_sim_reset = False, False
-        S.started_at_iso = datetime.now(timezone.utc).isoformat()
-        S.timer_epoch, S.timer_sequence = uuid4().hex, 0
+            _activate_run(SimulationEngine(Config.from_dict(data)), data, new_run=True)
+    _run(go)
+
+
+def on_apply_new_config_ask() -> None:
+    S.pending_new_config = True
+
+
+def on_apply_new_config_cancel() -> None:
+    S.pending_new_config = False
+
+
+def on_apply_new_config_confirm() -> None:
+    """Tạo phiên mới theo cấu hình đã lưu; không đổi thông số của phiên cũ."""
+    def go() -> None:
+        data = _selected_saved_config()
+        if data is None:
+            raise RuntimeError("Cấu hình được chọn không còn tồn tại. Vui lòng chọn lại ở Tab 1.")
+        old_engine = S.engine
+        if old_engine is not None and old_engine.session_state == 'RUNNING':
+            raise RuntimeError("Hãy Pause hoặc Stop trước khi áp dụng cấu hình mới.")
+        # Validate và khởi tạo Engine mới TRƯỚC khi chốt phiên cũ.
+        new_engine = SimulationEngine(Config.from_dict(data))
+        if old_engine is not None and old_engine.has_started:
+            if old_engine.session_state == 'PAUSED':
+                old_engine.stop()
+            # Đưa summary cũ vào lịch sử/outbox trước khi thay S.engine.
+            if old_engine.session_state in ('STOPPED', 'COMPLETED'):
+                _persist_history()
+        _activate_run(new_engine, data, new_run=True)
     _run(go)
 
 
@@ -309,7 +351,10 @@ def render_simulation_tab() -> None:
     ready = S.manager is not None and state.get_config(S.use_config_id or S.selected_config_id) is not None
 
     # ---- Cấu hình đã chốt ----
-    cfg = S.run_config_snapshot if engine is not None else state.get_config(S.use_config_id or S.selected_config_id)
+    saved_cfg = _selected_saved_config()
+    cfg = S.run_config_snapshot if engine is not None else saved_cfg
+    has_new_config = (engine is not None and saved_cfg is not None
+                      and S.run_config_snapshot is not None and saved_cfg != S.run_config_snapshot)
     with st.container(border=True):
         if cfg:
             r, q = cfg["rates_per_min"], cfg
@@ -324,9 +369,47 @@ def render_simulation_tab() -> None:
                         '<div class="run-sub">Tạo hoặc chọn một cấu hình ở tab Quản lý cấu hình.</div>',
                         unsafe_allow_html=True)
 
+    # ---- Cảnh báo khi cấu hình đã lưu khác bản chốt của Engine ----
+    if has_new_config:
+        old_cfg = S.run_config_snapshot
+        if old_cfg["id"] == saved_cfg["id"]:
+            st.warning(
+                f"Cấu hình '{saved_cfg['id']}' đã được lưu với {saved_cfg['cycles_to_run']} chu kỳ, "
+                f"nhưng phiên hiện tại vẫn dùng {old_cfg['cycles_to_run']} chu kỳ. "
+                "Thông số phiên đang chạy không tự thay đổi; Reset sẽ phát lại bản cũ."
+            )
+        else:
+            st.warning(
+                f"Phiên hiện tại đang dùng '{old_cfg['id']}' "
+                f"({old_cfg['cycles_to_run']} chu kỳ); cấu hình được chọn cho phiên tiếp theo "
+                f"là '{saved_cfg['id']}' ({saved_cfg['cycles_to_run']} chu kỳ)."
+            )
+        if name == 'RUNNING':
+            st.caption("Hãy Pause hoặc Stop rồi áp dụng cấu hình mới để tạo phiên khác.")
+        else:
+            st.button(
+                f"Áp dụng cấu hình đã lưu ({saved_cfg['cycles_to_run']} chu kỳ) và chạy phiên mới",
+                key="sim_apply_new_config", on_click=on_apply_new_config_ask,
+            )
+            if S.pending_new_config:
+                with st.container(border=True):
+                    st.markdown(
+                        f"**Xác nhận tạo phiên mới với {saved_cfg['cycles_to_run']} chu kỳ?** "
+                        "Phiên cũ sẽ dừng và được lưu lịch sử khi có thể; "
+                        "tiến độ hiện tại không được chuyển sang phiên mới."
+                    )
+                    a, b, _ = st.columns([1, 2, 5])
+                    a.button("Hủy", key="sim_apply_new_config_cancel",
+                             on_click=on_apply_new_config_cancel)
+                    b.button("Xác nhận dùng cấu hình mới", key="sim_apply_new_config_confirm",
+                             on_click=on_apply_new_config_confirm)
+    elif S.pending_new_config:
+        S.pending_new_config = False
+
     # ---- Thanh điều khiển ----
     ctl = st.columns([113, 113, 129, 111, 113, 149, 213, 244, 590], gap="small")
-    ctl[0].button("Start", key="sim_start", on_click=on_start,
+    start_label = "Start (phát lại bản cũ)" if has_new_config and unstarted else "Start"
+    ctl[0].button(start_label, key="sim_start", on_click=on_start,
                   disabled=not (unstarted or ready and (engine is None or name in FINISHED)))
     ctl[1].button("Pause", key="sim_pause", on_click=on_pause, disabled=name != "RUNNING")
     ctl[2].button("Resume", key="sim_resume", on_click=on_resume, disabled=name != "PAUSED" or unstarted)

@@ -1,4 +1,4 @@
-"""Kiểm tra artifacts/schema/fixture Task 5, không kiểm thử CRUD chưa có code."""
+"""Kiểm tra artifacts/schema/fixture Task 5; CRUD có bộ test riêng."""
 
 from copy import deepcopy
 import json
@@ -31,11 +31,11 @@ def validator():
     return jsonschema.Draft202012Validator(schema)
 
 
-def test_example_and_runtime_skeleton_match_schema(example, validator):
+def test_example_runtime_and_empty_skeleton_match_schema(example, validator):
     validator.validate(example)
     runtime = read_json("data/junctions.json")
     validator.validate(runtime)
-    assert runtime == {"schema_version": 2, "configs": []}
+    validator.validate({"schema_version": 2, "configs": []})
     assert "configurations" not in example
 
 

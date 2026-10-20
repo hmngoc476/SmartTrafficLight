@@ -18,7 +18,7 @@ def allocate_green_fixed(green_budget: int, min_green: int) -> tuple[int, int]:
     integer('green_budget', green_budget, 2)
     integer('min_green', min_green, 1)
     if green_budget < 2 * min_green:
-        raise ValueError('green_budget phải >= 2 * min_green.')
+        raise ValueError('green total phải >= 2 * min green.')
     return green_budget // 2, green_budget - green_budget // 2
 
 

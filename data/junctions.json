@@ -5,10 +5,10 @@
       "id": "JCT-001",
       "name": "Giao lộ mẫu - lệch hướng Đông Tây",
       "rates_per_min": {
-        "N": 12,
-        "S": 9,
-        "E": 18,
-        "W": 7
+        "N": 12.0,
+        "S": 9.0,
+        "E": 18.0,
+        "W": 7.0
       },
       "initial_queue": {
         "N": 7,
@@ -17,12 +17,12 @@
         "W": 5
       },
       "green_budget_s": 60,
-      "min_green_s": 10,
+      "min_green_s": 20,
       "yellow_s": 3,
       "all_red_s": 1,
       "startup_delay_s": 2,
-      "headway_s": 2,
-      "cycles_to_run": 10,
+      "headway_s": 1,
+      "cycles_to_run": 5,
       "seed": 2026,
       "motion_2d": {
         "enabled": true,
@@ -31,6 +31,42 @@
         "min_gap_m": 2.0,
         "max_speed_mps": 9.0,
         "accel_mps2": 2.0,
+        "approach_visible_m": 60.0,
+        "intersection_width_m": 16.0,
+        "stop_margin_m": 0.5,
+        "clearance_limit_s": 30.0
+      }
+    },
+    {
+      "id": "JCT-002",
+      "name": "Giao lộ mẫu - Bắc Nam",
+      "rates_per_min": {
+        "N": 24.0,
+        "S": 20.0,
+        "E": 6.0,
+        "W": 6.0
+      },
+      "initial_queue": {
+        "N": 16,
+        "S": 12,
+        "E": 2,
+        "W": 3
+      },
+      "green_budget_s": 60,
+      "min_green_s": 20,
+      "yellow_s": 3,
+      "all_red_s": 1,
+      "startup_delay_s": 2,
+      "headway_s": 1,
+      "cycles_to_run": 7,
+      "seed": 2026,
+      "motion_2d": {
+        "enabled": true,
+        "dt_s": 0.2,
+        "vehicle_length_m": 4.5,
+        "min_gap_m": 2.0,
+        "max_speed_mps": 9.0,
+        "accel_mps2": 3.0,
         "approach_visible_m": 60.0,
         "intersection_width_m": 16.0,
         "stop_margin_m": 0.5,

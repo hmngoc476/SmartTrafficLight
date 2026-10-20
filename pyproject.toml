@@ -17,3 +17,7 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--basetemp=.pytest_tmp"
+cache_dir = ".pytest_cache_local"

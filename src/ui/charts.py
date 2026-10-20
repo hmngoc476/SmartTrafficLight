@@ -11,15 +11,15 @@ from src.ui.labels import T
 import streamlit as st
 
 SVG_OPEN = '<svg width="560" height="104" viewBox="0 0 560 104" xmlns="http://www.w3.org/2000/svg">'
-LINE_COLOR = "#738795"
-NS_COLOR, EW_COLOR, FLOW_COLOR = "#839EAA", "#B5BFC6", "#9CABB5"
+LINE_COLOR = "#064D80"
+NS_COLOR, EW_COLOR, FLOW_COLOR = "#017817", "#EDF084", "#EDF084"
 BASE_Y = 74          # đường nền cột
 MAX_BAR_PX = 53
 MAX_GROUPS = 6
 
 
 def _caption() -> str:
-    return f'<div class="chart-cap">{T["chart_caption"]}</div>'
+    return ""
 
 
 def empty_chart() -> str:
@@ -82,8 +82,12 @@ def green_chart(cycles: tuple[CycleMetrics, ...]) -> str:
         parts.append(_bar(cx - bar_w - 1, bar_w, g.green_ns_s, unit, NS_COLOR))
         parts.append(_bar(cx + 1, bar_w, g.green_ew_s, unit, EW_COLOR))
         parts.append(f'<text class="ct" x="{cx:.1f}" y="97" text-anchor="middle">C{g.cycle_index}</text>')
-    legend = ('<rect x="440" y="2" width="10" height="10" fill="#839EAA"/><text class="ct" x="454" y="11">NS</text>'
-              '<rect x="486" y="2" width="10" height="10" fill="#B5BFC6"/><text class="ct" x="500" y="11">EW</text>')
+        legend = (
+        f'<rect x="440" y="2" width="10" height="10" fill="{NS_COLOR}"/>'
+        '<text class="ct" x="454" y="11">NS</text>'
+        f'<rect x="486" y="2" width="10" height="10" fill="{EW_COLOR}"/>'
+        '<text class="ct" x="500" y="11">EW</text>'
+    )
     return _caption() + SVG_OPEN + "".join(parts) + legend + "</svg>"
 
 
@@ -97,7 +101,7 @@ def flow_chart(cycles: tuple[CycleMetrics, ...]) -> str:
         g = groups[0]
         tag = f"C{g.cycle_index} tạm" if g.provisional else f"C{g.cycle_index}"
         return (_caption() + SVG_OPEN
-                + _bar(103, 85, g.arrivals, unit, FLOW_COLOR) + _bar(279, 85, g.departures, unit, FLOW_COLOR)
+                + _bar(103, 85, g.arrivals, unit, NS_COLOR) + _bar(279, 85, g.departures, unit, EW_COLOR) + _bar(279, 85, g.departures, unit, FLOW_COLOR)
                 + '<text class="ct" x="145" y="97" text-anchor="middle">Arrivals</text>'
                 '<text class="ct" x="321" y="97" text-anchor="middle">Departures</text>'
                 f'<text class="ct" x="522" y="97" text-anchor="middle">{tag}</text></svg>')
@@ -106,12 +110,16 @@ def flow_chart(cycles: tuple[CycleMetrics, ...]) -> str:
     parts = []
     for i, g in enumerate(groups):
         cx = 18 + slot * (i + 0.5)
-        parts.append(_bar(cx - bar_w - 1, bar_w, g.arrivals, unit, "#839EAA"))
-        parts.append(_bar(cx + 1, bar_w, g.departures, unit, "#B5BFC6"))
+        parts.append(_bar(cx - bar_w - 1, bar_w, g.arrivals, unit, NS_COLOR))
+        parts.append(_bar(cx + 1, bar_w, g.departures, unit, EW_COLOR))
         label = f"C{g.cycle_index}" + (" tạm" if g.provisional else "")
         parts.append(f'<text class="ct" x="{cx:.1f}" y="97" text-anchor="middle">{label}</text>')
-    legend = ('<rect x="400" y="2" width="10" height="10" fill="#839EAA"/><text class="ct" x="414" y="11">Arrivals</text>'
-              '<rect x="466" y="2" width="10" height="10" fill="#B5BFC6"/><text class="ct" x="480" y="11">Departures</text>')
+        legend = (
+        f'<rect x="400" y="2" width="10" height="10" fill="{NS_COLOR}"/>'
+        '<text class="ct" x="414" y="11">Arrivals</text>'
+        f'<rect x="466" y="2" width="10" height="10" fill="{EW_COLOR}"/>'
+        '<text class="ct" x="480" y="11">Departures</text>'
+    )
     return _caption() + SVG_OPEN + "".join(parts) + legend + "</svg>"
 
 _IFRAME_CSS = (

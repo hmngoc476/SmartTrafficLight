@@ -58,6 +58,9 @@ def reload_data() -> None:
 
 
 def init_session() -> None:
+    # Defaults also support browser sessions opened before comparison was added.
+    for key in ('comparison_run_id', 'comparison_result', 'comparison_error'):
+        S.setdefault(key, None)
     if "manager" in S:
         # Hỗ trợ phiên Streamlit đã mở trước khi triển khai nút áp dụng cấu hình mới.
         if "pending_new_config" not in S:

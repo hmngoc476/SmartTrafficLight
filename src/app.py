@@ -28,9 +28,6 @@ HEADER_HTML = f"""
         <div class="app-title">Smart Traffic Light Simulator</div>
         <div class="app-sub">{T["header_sub"]}</div>
     </div>
-    <div>
-        <span class="badge">{T["badge"]}</span>
-    </div>
 </div>
 """
 st.markdown(HEADER_HTML, unsafe_allow_html=True)

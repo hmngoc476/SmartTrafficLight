@@ -178,3 +178,113 @@ def test_concurrent_runs_and_retries_keep_both_files_consistent(report,tmp_path)
     assert sum(results) == 8
     assert len(history) == len(cycles) == 8
     assert {r['run_id'] for r in history} == {r['run_id'] for r in cycles} == set(run_ids)
+def test_export_csv_after_class_reload(report):
+    from dataclasses import asdict, fields, make_dataclass
+    from src.core.statistics import CycleMetrics
+
+    summary, cycles = report
+
+    # Mo phong class CycleMetrics cua phien Python cu
+    OldCycleMetrics = make_dataclass(
+        "CycleMetrics",
+        [(f.name, object) for f in fields(CycleMetrics)],
+        module=CycleMetrics.__module__,
+    )
+
+    old_cycles = tuple(
+        OldCycleMetrics(**asdict(metric))
+        for metric in cycles
+    )
+
+    # Class cu khong cung danh tinh voi class hien tai
+    assert not isinstance(old_cycles[0], CycleMetrics)
+
+    # Nhung van phai xuat duoc CSV neu schema hop le
+    result = hs.summary_csv_text(
+        summary,
+        old_cycles,
+        run_id="test-reload",
+        started_at_iso=STAMP
+    )
+
+    assert result.startswith("run_id,started_at_iso")
+
+
+def test_real_module_reload_preserves_csv_and_idempotent_storage(tmp_path):
+    """Reload in another interpreter so class identities cannot leak to other tests."""
+    import subprocess
+    import textwrap
+
+    script = textwrap.dedent('''
+        import csv
+        import importlib
+        import sys
+        from dataclasses import asdict
+        from pathlib import Path
+        from src.core import statistics, history_storage as hs
+        from src.core.simulation import SimulationEngine
+        from src.models.config import Config
+
+        engine = SimulationEngine(Config(
+            cycles_to_run=2, rates_per_min=dict.fromkeys('NSEW', 0),
+            initial_queue=dict(N=2, S=0, E=0, W=0)))
+        engine.start()
+        engine.run_ticks(69)
+        engine.stop()
+        summary, old_cycles = engine.summary(), engine.cycle_metrics()
+        assert len(old_cycles) == 2 and old_cycles[-1].provisional
+        metadata = dict(run_id='reload', started_at_iso='2026-10-19T12:00:00+07:00')
+        before = hs.summary_csv_text(summary, old_cycles, **metadata)
+        importlib.reload(statistics)
+        importlib.reload(hs)
+        assert not isinstance(old_cycles[0], hs.CycleMetrics)
+        mixed_cycles = (old_cycles[0], hs.CycleMetrics(**asdict(old_cycles[1])))
+        assert hs.summary_csv_text(summary, old_cycles, **metadata) == before
+        assert hs.summary_csv_text(summary, mixed_cycles, **metadata) == before
+        root = Path(sys.argv[1])
+        history, cycles = root/'history.csv', root/'cycles.csv'
+        assert hs.HistoryStorage.append_run(summary, old_cycles, history, cycles, **metadata)
+        assert not hs.HistoryStorage.append_run(summary, mixed_cycles, history, cycles, **metadata)
+        for path in (history, cycles):
+            with path.open(encoding='utf-8', newline='') as stream:
+                assert len(list(csv.DictReader(stream))) == 1
+        assert engine.summary() == summary
+        print('reload regression passed')
+    ''')
+    result = subprocess.run(
+        [sys.executable, '-B', '-c', script, str(tmp_path)],
+        cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'reload regression passed' in result.stdout
+
+
+@pytest.mark.parametrize('invalid_kind', ['dict', 'wrong_module', 'wrong_name', 'changed_schema', 'nan'])
+def test_reload_compatibility_does_not_accept_invalid_cycles(report, tmp_path, invalid_kind):
+    from dataclasses import asdict, fields, make_dataclass
+    from src.core.statistics import CycleMetrics
+
+    summary, cycles = report
+    save(report, tmp_path)
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    values = asdict(cycles[0])
+    schema = [(field.name, object) for field in fields(CycleMetrics)]
+    if invalid_kind == 'dict':
+        invalid = values
+    else:
+        if invalid_kind == 'changed_schema':
+            schema = [(name, kind) for name, kind in schema if name != 'provisional']
+            values.pop('provisional')
+        if invalid_kind == 'nan':
+            values['avg_queue_cycle'] = float('nan')
+        old_type = make_dataclass(
+            'OtherMetrics' if invalid_kind == 'wrong_name' else 'CycleMetrics', schema,
+            module='unrelated.statistics' if invalid_kind == 'wrong_module' else CycleMetrics.__module__,
+        )
+        invalid = old_type(**values)
+    invalid_cycles = (invalid, *cycles[1:])
+    with pytest.raises((TypeError, ValueError)):
+        hs.summary_csv_text(summary, invalid_cycles, run_id='bad', started_at_iso=STAMP)
+    with pytest.raises((TypeError, ValueError)):
+        save((summary, invalid_cycles), tmp_path, run_id='bad')
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before

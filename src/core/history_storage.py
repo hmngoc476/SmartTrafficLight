@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from contextlib import ExitStack
 from datetime import datetime
+from dataclasses import fields, is_dataclass
 import csv
 import io
 import os
@@ -68,11 +69,59 @@ def summary_row(summary: Mapping, *, run_id: str, started_at_iso: str) -> dict:
             or (row['avg_queue'] is None) != (row['simulation_seconds'] == 0)):
         raise ValueError('Average phải để trống đúng khi chưa có mẫu.')
     return row
+def _canonical_cycle_metric(metric: CycleMetrics) -> CycleMetrics:
+    """
+    Chuan hoa CycleMetrics khi Streamlit reload module.
 
+    Chap nhan:
+    - Doi tuong CycleMetrics hien tai.
+    - Doi tuong CycleMetrics cu co cung module va schema.
+
+    Tu choi du lieu khong dung nguon hoac khac cau truc.
+    """
+
+    # Truong hop 1: Dung class hien tai
+    if isinstance(metric, CycleMetrics):
+        return metric
+
+    metric_type = type(metric)
+
+    # Truong hop 2: Kiem tra danh tinh class va nguon goc
+    if (
+        metric_type.__module__ != CycleMetrics.__module__
+        or metric_type.__qualname__ != CycleMetrics.__qualname__
+        or not is_dataclass(metric)
+    ):
+        raise TypeError(
+            "Du lieu chu ky khong phai CycleMetrics tu Core."
+        )
+
+    # Lay danh sach truong cua hai phien ban class
+    expected_fields = tuple(
+        field.name for field in fields(CycleMetrics)
+    )
+
+    actual_fields = tuple(
+        field.name for field in fields(metric)
+    )
+
+    # Khong cho phep du lieu sai schema
+    if actual_fields != expected_fields:
+        raise TypeError(
+            "Cau truc CycleMetrics da thay doi. "
+            "Vui long tao phien mo phong moi."
+        )
+
+    # Tai tao bang class CycleMetrics hien tai
+    values = {
+        name: getattr(metric, name)
+        for name in expected_fields
+    }
+
+    return CycleMetrics(**values)
 
 def cycle_row(run_id: str, metric: CycleMetrics) -> dict:
-    if not isinstance(metric, CycleMetrics):
-        raise TypeError('Chu kỳ phải là CycleMetrics từ Core.')
+    metric = _canonical_cycle_metric(metric)
     if metric.provisional:
         raise ValueError('Không ghi chu kỳ đang chạy vào CSV.')
     row = {key: run_id if key == 'run_id' else getattr(metric, key) for key in CYCLE_HEADER}
@@ -90,10 +139,23 @@ def cycle_row(run_id: str, metric: CycleMetrics) -> dict:
 
 
 def _prepare(summary, cycles, *, run_id, started_at_iso):
-    row = summary_row(summary, run_id=run_id, started_at_iso=started_at_iso)
-    if not all(isinstance(metric, CycleMetrics) for metric in cycles):
-        raise TypeError('Chu kỳ phải là CycleMetrics từ Core.')
-    closed = [metric for metric in cycles if not metric.provisional]
+    row = summary_row(
+        summary,
+        run_id=run_id,
+        started_at_iso=started_at_iso
+    )
+
+    # Chuan hoa du lieu chu ky truoc khi xuat CSV
+    canonical = tuple(
+        _canonical_cycle_metric(metric)
+        for metric in cycles
+    )
+
+    # Chi xuat cac chu ky da hoan thanh
+    closed = [
+        metric for metric in canonical
+        if not metric.provisional
+    ]
     rows = [cycle_row(run_id, metric) for metric in closed]
     if len(closed) != row['cycles_completed'] or [m.cycle_index for m in closed] != list(range(1, len(closed)+1)):
         raise ValueError('Danh sách chu kỳ đã chốt không khớp Summary.')

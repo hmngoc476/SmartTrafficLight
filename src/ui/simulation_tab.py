@@ -17,6 +17,7 @@ from src.core.simulation import SimulationEngine
 from src.models.config import Config
 from src.models.snapshot import SimulationSnapshot
 from src.ui import charts, state
+from src.ui.comparison_panel import render_comparison_panel
 from src.ui.labels import T
 from src.ui.renderer_2d import VEHICLE_STYLE, build_map_figure
 from src.ui.timer import timer_event
@@ -202,8 +203,6 @@ def _legend(snapshot: SimulationSnapshot | None, motion_on: bool) -> str:
     note = "" if motion_on else '<div class="lg-note">Motion 2D đang tắt: không vẽ xe.</div>'
     return (f'<div class="legend"><div class="lg-title">Chú giải</div>{rows}'
             f'<div class="lg-phase">N/S: {ns}<br>E/W: {ew}</div>'
-            '<div class="lg-note">Ô nét đứt: vùng xung đột<br>Điểm trên xe: tọa độ đầu xe</div>'
-            '<div class="lg-note">Zoom ngã tư / một phần xe<br>Xe ngoài hình vẫn thuộc Core</div>'
             f'{note}</div>')
 
 
@@ -268,7 +267,7 @@ def _dashboard() -> None:
                          _metric("Chu kỳ", f"— / {_dash(cycles_total)}"), _metric("Thời gian", "—"))
             st.markdown(_grid(*cells), unsafe_allow_html=True)
 
-        with _card("Queue hiện tại · xe chưa vượt vạch"):
+        with _card("Số lượng xe chưa vượt vạch"):
             q = snap.metrics.queue_lengths if snap else None
             sub = f"NS {q['N'] + q['S']} xe / EW {q['E'] + q['W']} xe" if q else ""
             st.markdown(_grid(*[
@@ -295,11 +294,10 @@ def _dashboard() -> None:
             if dd:
                 ns, ew = dd.current_green
                 prev = f"{dd.previous_green[0]}s / {dd.previous_green[1]}s" if dd.previous_green else "— / —"
-                title = f"Xanh đã chốt: NS {ns}s / EW {ew}s · Chu kỳ trước: {prev}"
+                title = f"Thời gian xanh ở mỗi pha: NS {ns}s / EW {ew}s · Chu kỳ trước: {prev}"
             else:
-                title = "Xanh đã chốt: — · Chu kỳ trước: — / —"
-            st.markdown(f'<div class="lock-title">{title}</div>'
-                        '<div class="lock-sub">Chỉ tính lại ở đầu chu kỳ; không thay đổi tùy tiện trong từng giây.</div>',
+                title = "Thời gian xanh ở mỗi pha: — · Chu kỳ trước: — / —"
+            st.markdown(f'<div class="lock-title">{title}</div>',
                         unsafe_allow_html=True)
 
         with st.container(border=True):
@@ -314,15 +312,47 @@ def _dashboard() -> None:
                            f" · thời gian dừng TB {stopped}")
                 else:
                     sub = "Mở khi STOPPED/COMPLETED · không đồng nghĩa hết xe chờ"
-                st.markdown(f'<div class="sum-title">Summary cuối phiên: {"có" if summary else "chưa có"}</div>'
+                st.markdown(f'<div class="sum-title">Tổng kết cuối phiên: {"có" if summary else "chưa có"}</div>'
                             f'<div class="sum-sub">{sub}</div>', unsafe_allow_html=True)
             with s2:
-                exportable = summary is not None and summary['status'] in ('STOPPED', 'COMPLETED')
-                data = summary_csv_text(summary, dd.cycle_metrics, run_id=S.run_id,
-                                        started_at_iso=S.started_at_iso) if exportable else ""
-                st.download_button("Xuất CSV", data, file_name=f"{S.run_id}.csv" if exportable else "summary.csv",
-                                   mime="text/csv", key="btn_csv", disabled=not exportable)
+                exportable = (
+                    summary is not None
+                    and summary["status"] in ("STOPPED", "COMPLETED")
+                )
 
+                csv_data = ""
+                csv_error = None
+
+                if exportable:
+                    try:
+                        csv_data = summary_csv_text(
+                            summary,
+                            dd.cycle_metrics,
+                            run_id=S.run_id,
+                            started_at_iso=S.started_at_iso
+                        )
+
+                    except (TypeError, ValueError) as exc:
+                        csv_error = str(exc)
+                        exportable = False
+
+                st.download_button(
+                    label="Xuất CSV",
+                    data=csv_data,
+                    file_name=(
+                        f"{S.run_id}.csv"
+                        if exportable
+                        else "summary.csv"
+                    ),
+                    mime="text/csv",
+                    key="btn_csv",
+                    disabled=not exportable
+                )
+
+            if csv_error:
+                st.error(
+                    f"Không thể tạo CSV: {csv_error}"
+                )
     # ---- Ba biểu đồ ----
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
@@ -419,8 +449,8 @@ def render_simulation_tab() -> None:
     ctl[5].button("Step +1s", key="sim_step", on_click=on_step, disabled=name != "PAUSED" or unstarted)
     ctl[6].button("Chạy hết chu kỳ", key="sim_cycle", on_click=on_cycle, disabled=name != "PAUSED" or unstarted)
     ctl[8].markdown(
-        f'<div class="status-box">{name}{T["status_suffix"]} · Step / Chạy chu kỳ chỉ bật khi PAUSED</div>',
-        unsafe_allow_html=True)
+    f'<div class="status-box">{name}{T["status_suffix"]}</div>',
+    unsafe_allow_html=True)
 
     if S.pending_sim_reset:
         with st.container(border=True):
@@ -436,6 +466,5 @@ def render_simulation_tab() -> None:
         st.button("Thử lại ghi lịch sử", key="sim_history_retry", on_click=on_retry_history)
 
     _dashboard()
+    render_comparison_panel()
 
-    st.markdown('<p class="foot">Core → Snapshot / báo cáo chỉ đọc → Renderer · '
-                "UI không tự sinh xe, tính Adaptive, sửa Queue hoặc CSV</p>", unsafe_allow_html=True)

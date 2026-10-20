@@ -210,7 +210,125 @@ def test_ui_error_stays_all_red_and_does_not_export_as_completed(app):
     assert set(engine.snapshot().signals.signal_colors.values()) == {'RED'}
     assert not history_storage.HISTORY_PATH.exists()
     assert at.get('download_button')[0].proto.disabled
+    assert at.button(key='sim_compare_fixed').disabled
     assert not at.exception
+
+
+def test_compare_finished_browser_run_uses_frozen_config_and_keeps_history(app, monkeypatch):
+    from src.ui import comparison_panel
+    import csv
+    import io
+
+    at = app
+    assert at.button(key='sim_compare_fixed').disabled
+    create_config(at, cycles=1)
+    at.button(key='sim_start').click().run()
+    assert at.button(key='sim_compare_fixed').disabled
+    at.button(key='sim_pause').click().run()
+    assert at.button(key='sim_compare_fixed').disabled
+    at.button(key='sim_cycle').click().run()
+    engine = at.session_state['engine']
+    original_summary = engine.summary()
+    frozen = at.session_state['run_config_snapshot'].copy()
+    at.number_input(key='f_headway_s').set_value(7).run()
+    at.text_input(key='f_name').set_value('Saved later').run()
+    at.button(key='btn_update').click().run()
+    files_before = {p: p.read_bytes() for p in Path('data').iterdir()}
+    calls = []
+    original_compare = comparison_panel.compare_finished_run
+
+    def compare(config, summary):
+        calls.append(config.to_dict())
+        return original_compare(config, summary)
+
+    monkeypatch.setattr(comparison_panel, 'compare_finished_run', compare)
+    at.button(key='sim_compare_fixed').click().run()
+    assert not at.exception
+    result = at.session_state['comparison_result']
+    assert result.comparable
+    assert result.adaptive.summary == original_summary
+    assert calls == [frozen]
+    assert engine.summary() == original_summary
+    assert files_before == {p: p.read_bytes() for p in Path('data').iterdir()}
+    export = next(b for b in at.get('download_button') if b.proto.label == 'Tải CSV so sánh')
+    assert not export.proto.disabled
+    assert any('Fixed-Time: NS 30s / EW 30s' in m.value for m in at.markdown)
+    from src.core.comparison import comparison_csv_text
+    from src.models.config import Config
+    rows = list(csv.DictReader(io.StringIO(comparison_csv_text(
+        result, Config.from_dict(frozen), run_id=at.session_state['run_id'],
+        started_at_iso=at.session_state['started_at_iso']))))
+    assert all(row['config_name'] == 'UI integration' for row in rows)
+    at.run()
+    assert len(calls) == 1
+    assert at.button(key='sim_compare_fixed').disabled
+    at.button(key='sim_reset').click().run()
+    at.button(key='sim_reset_confirm').click().run()
+    assert at.session_state['comparison_result'] is None
+    assert at.button(key='sim_compare_fixed').disabled
+    assert all(b.proto.label != 'Tải CSV so sánh' for b in at.get('download_button'))
+
+
+def test_compare_requires_completion_and_failed_comparison_can_retry(app, monkeypatch):
+    from src.ui import comparison_panel
+
+    at = app
+    create_config(at, cycles=1)
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_stop').click().run()
+    assert at.button(key='sim_compare_fixed').disabled
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    at.button(key='sim_step').click().run()
+    at.button(key='sim_stop').click().run()
+    assert at.button(key='sim_compare_fixed').disabled
+    assert at.session_state['comparison_result'] is None
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    at.button(key='sim_cycle').click().run()
+    assert at.session_state['engine'].session_state == 'COMPLETED'
+    assert not at.button(key='sim_compare_fixed').disabled
+    # Completing and rerendering the page must not start a comparison automatically.
+    at.run()
+    assert at.session_state['comparison_result'] is None
+    assert all(b.proto.label != 'Tải CSV so sánh' for b in at.get('download_button'))
+    with monkeypatch.context() as patch:
+        def fail_compare(*args):
+            raise RuntimeError('Comparison unavailable')
+        patch.setattr(comparison_panel, 'compare_finished_run', fail_compare)
+        at.button(key='sim_compare_fixed').click().run()
+        assert not at.exception
+        assert at.session_state['comparison_result'] is None
+        assert any('Comparison unavailable' in error.value for error in at.error)
+    at.button(key='sim_compare_fixed').click().run()
+    assert not at.exception
+    assert at.session_state['comparison_result'].horizon_s == 68
+    assert at.session_state['comparison_error'] is None
+
+
+def test_stopping_after_one_of_two_cycles_cannot_compare_or_keep_old_report(app, monkeypatch):
+    from src.ui import comparison_panel
+
+    at = app
+    create_config(at, cycles=2)
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    at.button(key='sim_cycle').click().run()
+    assert at.session_state['engine'].summary()['cycles_completed'] == 1
+    assert at.button(key='sim_compare_fixed').disabled
+    at.button(key='sim_stop').click().run()
+    assert at.button(key='sim_compare_fixed').disabled
+
+    def must_not_compare(*args):
+        pytest.fail('An incomplete run must not trigger comparison')
+
+    monkeypatch.setattr(comparison_panel, 'compare_finished_run', must_not_compare)
+    # An early-Stop report cached by the previous app version must also disappear.
+    at.session_state['comparison_result'] = 'old early-stop report'
+    at.run()
+    assert not at.exception
+    assert at.session_state['comparison_result'] is None
+    assert all(b.proto.label != 'Tải CSV so sánh' for b in at.get('download_button'))
 
 
 def test_timer_uses_unique_events_and_discards_stale_epochs(app):
@@ -288,3 +406,62 @@ def test_history_failure_retains_outbox_across_new_run_and_retry(app, monkeypatc
     with history_storage.CYCLES_PATH.open() as f:
         assert len(list(csv.DictReader(f))) == 1
     assert not at.exception
+
+
+def test_dashboard_and_outbox_export_cycles_retained_before_reload(app):
+    from dataclasses import asdict, fields, make_dataclass
+    from src.core.statistics import CycleMetrics
+
+    at = app
+    create_config(at, cycles=2)
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    at.button(key='sim_cycle').click().run()
+    engine = at.session_state['engine']
+    old_type = make_dataclass(
+        'CycleMetrics', [(field.name, object) for field in fields(CycleMetrics)],
+        module=CycleMetrics.__module__,
+        namespace={name: value for name, value in vars(CycleMetrics).items()
+                   if isinstance(value, property)},
+    )
+    engine.stats._cycles[:] = [old_type(**asdict(metric)) for metric in engine.stats.cycles]
+    assert not isinstance(engine.stats.cycles[0], CycleMetrics)
+    at.button(key='sim_stop').click().run()
+    assert not at.exception
+    assert not at.error
+    assert at.session_state['summary_saved']
+    assert not at.session_state['history_outbox']
+    assert not at.get('download_button')[0].disabled
+    before = [path.read_bytes() for path in (history_storage.HISTORY_PATH, history_storage.CYCLES_PATH)]
+    at.run()
+    assert not at.exception
+    assert not at.error
+    assert [path.read_bytes() for path in (history_storage.HISTORY_PATH, history_storage.CYCLES_PATH)] == before
+
+
+@pytest.mark.parametrize('error_type', [TypeError, ValueError])
+def test_csv_export_error_is_shown_without_crashing_dashboard(app, monkeypatch, error_type):
+    from src.ui import simulation_tab
+
+    at = app
+    create_config(at, cycles=1)
+    at.button(key='sim_start').click().run()
+    at.button(key='sim_pause').click().run()
+    at.button(key='sim_cycle').click().run()
+    assert not at.exception
+    before = [path.read_bytes() for path in (history_storage.HISTORY_PATH, history_storage.CYCLES_PATH)]
+
+    def fail_export(*args, **kwargs):
+        raise error_type('Injected CSV export error')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(simulation_tab, 'summary_csv_text', fail_export)
+        at.run()
+        assert not at.exception
+        assert any('Không thể tạo CSV:' in error.value for error in at.error)
+        assert at.get('download_button')[0].disabled
+    at.run()
+    assert not at.exception
+    assert not at.error
+    assert not at.get('download_button')[0].disabled
+    assert [path.read_bytes() for path in (history_storage.HISTORY_PATH, history_storage.CYCLES_PATH)] == before

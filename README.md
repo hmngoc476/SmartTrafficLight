@@ -5,8 +5,6 @@
 Đồ án **Python Module 1**: vận dụng lập trình hướng đối tượng (OOP), cấu trúc dữ liệu, thuật toán và kiến trúc phân tầng để mô phỏng dòng xe, điều khiển tín hiệu và quan sát kết quả trên giao diện web Streamlit.
 
 > **Phạm vi:** Mô hình học thuật của **một ngã tư, bốn hướng, hai pha NS/EW**. Đây **không phải** hệ thống điều khiển đèn giao thông ngoài thực địa hay phần mềm bảo đảm an toàn giao thông thực tế.
->
-> **Phạm vi tài liệu:** README này mô tả **source trong gói `SmartTrafficLight_sua_loi_chu_ky_3_10.zip`**, gồm bản cập nhật xử lý cấu hình mới khi phiên mô phỏng đang giữ cấu hình cũ. Cập nhật tài liệu: **19/10/2026**.
 
 ## Mục lục
 
@@ -42,6 +40,7 @@ Tại một ngã tư, lưu lượng xe theo trục **Bắc–Nam (NS)** và **Đ
 | Điều khiển phiên | Start, Pause, Resume, Stop, Reset, Step +1s, chạy đến hết chu kỳ; chế độ tự tiến theo nhịp trình duyệt. |
 | Dashboard | Đèn hiện tại, thời gian còn lại, chu kỳ, các Queue, số xe đến/qua/ra khung, biểu đồ và chỉ số an toàn. |
 | Lưu kết quả | Ghi lịch sử phiên và các chu kỳ đã chốt vào CSV; tải CSV tổng hợp từ Tab 2. |
+| So sánh phiên trên trình duyệt | Đối chứng phiên Adaptive vừa kết thúc với Fixed-Time, hiển thị bảng và tải CSV so sánh theo đúng cấu hình đã chạy. |
 | Thí nghiệm độc lập | So sánh Adaptive và Fixed-Time trên **cùng luồng xe sinh** và **cùng thời gian quan sát** bằng dòng lệnh. |
 | Kiểm thử | Các bài test cho Models, thuật toán, chuyển động, Controller, lưu trữ, giao diện và báo cáo. |
 
@@ -88,8 +87,6 @@ Không yêu cầu cài đặt MySQL, PostgreSQL, camera, YOLO hay SUMO.
 git clone https://github.com/hmngoc476/SmartTrafficLight.git
 cd SmartTrafficLight
 ```
-
-> Nếu clone từ GitHub thay vì dùng ZIP đã sửa, hãy kiểm tra repository đã chứa bản vá mới nhất cho chức năng áp dụng cấu hình trong `src/ui/simulation_tab.py`.
 
 ### 3.2. Đồng bộ môi trường
 
@@ -196,6 +193,7 @@ Bản đồ 2D và cụm chỉ số lấy từ `SimulationSnapshot`/`DashboardDa
 - Vùng xung đột, `min_gap_m` cấu hình, khoảng cách đo được và clearance hold.
 - Biểu đồ độ dài Queue theo thời gian, thời gian xanh theo chu kỳ, arrivals/departures.
 - Thống kê cuối phiên và chức năng tải CSV khi phiên kết thúc hợp lệ.
+- Bảng so sánh với Fixed-Time khi chạy đủ số chu kỳ đã cấu hình (`COMPLETED`): cùng bản cấu hình đã chốt, seed và thời gian mô phỏng.
 
 ---
 
@@ -337,6 +335,7 @@ SmartTrafficLight-main/
 │   └── ui/
 │       ├── config_tab.py       # Tab 1
 │       ├── simulation_tab.py   # Tab 2 / vòng đời UI
+│       ├── comparison_panel.py # So sánh phiên vừa chạy và tải CSV đối chứng
 │       ├── form.py / state.py  # Form và session_state
 │       ├── renderer_2d.py      # Vẽ bản đồ Plotly
 │       ├── charts.py          # Biểu đồ
@@ -458,10 +457,24 @@ Ví dụ một cấu hình hoàn chỉnh:
 | `data/sim_history.csv` | Một dòng tổng hợp cho mỗi phiên `STOPPED`/`COMPLETED`, định danh bằng `run_id`. |
 | `data/cycle_metrics.csv` | Các chu kỳ **đã hoàn tất** của từng phiên, khóa `run_id` + `cycle_index`. |
 | CSV tải từ Tab 2 | File tải trực tiếp gồm phần summary và (nếu có) phần chu kỳ, hai phần cách nhau bởi dòng trống. |
+| `<run_id>_comparison.csv` | Tải bằng **Tải CSV so sánh**: mỗi dòng là một chỉ số, có giá trị Adaptive/Fixed-Time, chênh lệch và phần trăm cải thiện. |
 
 Hai file lịch sử được ghi riêng bằng thao tác thay thế nguyên tử; nếu chỉ một file ghi thành công, UI giữ bản báo cáo trong phiên trình duyệt và cho phép **Thử lại ghi lịch sử**. Một phiên `ERROR` có dữ liệu chẩn đoán trên dashboard nhưng không tự ghi thành phiên `COMPLETED` trong CSV.
 
 > **Giới hạn:** Cơ chế thử lại trong `session_state` không phải nhật ký giao dịch bền vững; nếu đóng phiên trình duyệt/server trước khi ghi được CSV, dữ liệu đang giữ trong RAM có thể mất. Không xóa hai file CSV nếu cần giữ lịch sử.
+
+Để so sánh **cấu hình mới bạn vừa chạy trên trình duyệt**:
+
+1. Tạo/lưu cấu hình ở Tab 1, chọn **Dùng cấu hình này**, rồi **Start** ở Tab 2.
+2. Chạy đủ số chu kỳ đã cấu hình để phiên chuyển sang **COMPLETED**. Có thể dùng **Pause → Chạy hết chu kỳ** nhiều lần đến khi hoàn tất. Bấm **Stop** sớm sẽ không được so sánh, kể cả khi vừa kết thúc một chu kỳ nhưng chưa đủ tổng số chu kỳ.
+3. Bấm **So sánh với Fixed-Time** ở cuối Tab 2. Việc so sánh chỉ bắt đầu khi bấm nút, không tự chạy khi phiên hoàn tất. Hệ thống tái lập và kiểm chứng kết quả Adaptive, sau đó đối chiếu với Fixed-Time trên cùng chuỗi xe đến và đúng số giây của phiên vừa chạy.
+4. Xem bảng và bấm **Tải CSV so sánh**. Nút **Xuất CSV** cũ vẫn tải summary/chu kỳ của phiên Adaptive.
+
+So sánh dùng **bản cấu hình đã chốt khi Start**, kể cả khi cấu hình ở Tab 1 đã được sửa sau đó. Fixed-Time chia gần đều tổng ngân sách xanh; ví dụ 60 giây thành NS 30s/EW 30s. Số chu kỳ hoàn tất của hai chế độ có thể khác nhau. Phiên đối chứng không ghi thêm vào `sim_history.csv` hoặc `cycle_metrics.csv`.
+
+CSV so sánh là một bảng duy nhất, mã hóa UTF-8 có BOM để mở bằng Excel. File giữ `run_id`, seed, thời gian quan sát, trạng thái hai chế độ và toàn bộ cấu hình đã dùng trong `config_json`. `adaptive_minus_fixed` là Adaptive trừ Fixed; `improvement_pct` dương nghĩa là Adaptive tốt hơn theo chiều đánh giá của chỉ số đó. Giá trị thiếu, mốc Fixed bằng 0 và chỉ số dùng giải thích như clearance hold/chu kỳ không có phần trăm cải thiện. Nếu Fixed-Time gặp lỗi hoặc chưa đủ thời gian, `comparable=False`, các cột chênh lệch/phần trăm để trống và file chỉ dùng chẩn đoán.
+
+Thời gian dừng trung bình chỉ tính trên xe đã vượt vạch. Đây là kết quả **một kịch bản, một seed**; dùng thêm bộ CLI bên dưới khi cần kết luận qua nhiều seed. Kết quả so sánh chỉ giữ trong phiên trình duyệt; tải CSV trước khi Reset, Start phiên mới hoặc đóng app.
 
 ### 8.3. So sánh Adaptive và Fixed-Time bằng CLI
 
@@ -505,6 +518,10 @@ Từ thư mục gốc dự án:
 uv sync
 uv run --frozen pytest -q -ra
 ```
+
+Pytest dùng `.pytest_tmp/` và cache `.pytest_cache_local/` trong thư mục dự án để tránh lỗi quyền truy cập thư mục tạm trong `AppData` và cache cũ trên Windows. Hai thư mục đã được Git bỏ qua; riêng `.pytest_tmp/` được tạo lại mỗi lần chạy test, không lưu dữ liệu cần giữ vào đây.
+
+Trên Windows, không dùng chung thư mục tạm/cache giữa terminal cá nhân và tài khoản sandbox: pytest có thể giới hạn quyền theo tài khoản tạo thư mục. Khi chạy tự động bằng tài khoản khác, cần chỉ định đường dẫn riêng qua `--basetemp` và `-o cache_dir=...`.
 
 Kiểm tra cú pháp toàn bộ source (bổ trợ, không thay thế pytest):
 
@@ -610,7 +627,7 @@ A: Reset giữ bản chốt và seed. Với cùng code, cấu hình và thứ t�
 
 - Mô hình đơn giản phục vụ học tập; không thay thế mô phỏng thực địa chuyên dụng, chưa hỗ trợ nhiều giao lộ, rẽ trái/phải, người đi bộ, cảm biến hoặc ưu tiên xe khẩn cấp.
 - Thời lượng tín hiệu, vận tốc, gia tốc, kích thước và khoảng cách là **tham số mô phỏng**, không phải khuyến nghị lắp đặt đèn thật.
-- So sánh nhiều chính sách/seed hiện có bằng **CLI**, không có màn hình đối chứng đầy đủ trong Streamlit.
+- Streamlit so sánh một phiên vừa chạy với Fixed-Time; thí nghiệm nhiều kịch bản/seed dùng **CLI**. Hai chế độ chưa có bản đồ chạy song song trên trình duyệt.
 - Giao diện hiện chưa có chức năng đọc lại/phân tích toàn bộ phiên lịch sử sau khi mở lại app, hoặc xuất ảnh dashboard thành báo cáo riêng.
 - Ghi hai CSV không phải một giao dịch nguyên tử chung; thao tác phục hồi chỉ có hiệu lực khi outbox của phiên trình duyệt còn tồn tại.
 

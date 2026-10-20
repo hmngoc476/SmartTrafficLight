@@ -11,6 +11,8 @@ wheels/
 
 # Test, tool caches and local secrets
 .pytest_cache/
+.pytest_cache_local/
+.pytest_tmp/
 .mypy_cache/
 .ruff_cache/
 .uv-cache/

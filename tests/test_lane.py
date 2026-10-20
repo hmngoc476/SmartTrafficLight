@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from collections import deque
+from src.models.deque import Deque
 import pytest
 from src.models.lane import Lane
 from src.models.vehicle import Vehicle
@@ -10,7 +10,7 @@ from src.models.vehicle import Vehicle
 
 def test_empty_lane():
     lane = Lane('N')
-    assert isinstance(lane._queue, deque)
+    assert isinstance(lane._queue, Deque)
     assert lane.direction == 'N'
     assert lane.count() == 0
     assert lane.peek() is None

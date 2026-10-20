@@ -1,6 +1,6 @@
 """Lịch tín hiệu danh định; Controller quyết định khi nào chuyển đoạn."""
 
-from collections import deque
+from src.models.deque import Deque
 from dataclasses import dataclass, field
 
 from src.models.config import Config, direction, integer, number
@@ -61,7 +61,7 @@ class SignalPlan:
     all_red_s: int = 1
     cycle_no: int = 1
     _segments: tuple[SignalSegment, ...] = field(init=False, repr=False)
-    _pending: deque[SignalSegment] = field(init=False, repr=False)
+    _pending: Deque[SignalSegment] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         for name in ('green_ns_s', 'green_ew_s', 'yellow_s', 'all_red_s', 'cycle_no'):
@@ -75,7 +75,7 @@ class SignalPlan:
             SignalSegment('ALL_RED_2', None, 'RED', self.all_red_s),
         )
         object.__setattr__(self, '_segments', segments)
-        object.__setattr__(self, '_pending', deque(segments))
+        object.__setattr__(self, '_pending', Deque(segments))
 
     @property
     def segments(self) -> tuple[SignalSegment, ...]:

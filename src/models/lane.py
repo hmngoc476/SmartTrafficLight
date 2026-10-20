@@ -1,5 +1,5 @@
 """Hàng đợi FIFO của các xe chưa được lấy ra sau crossing."""
-from collections import deque
+from src.models.deque import Deque
 from src.models.config import direction as require_direction, number
 from src.models.vehicle import Vehicle
 
@@ -9,7 +9,7 @@ class Lane:
     def __init__(self, direction: str) -> None:
         require_direction(direction)
         self._direction = direction
-        self._queue: deque[Vehicle] = deque()
+        self._queue: Deque[Vehicle] = Deque()
         self._seen_ids: set[str] = set()
         self._green_started_at: float | None = None
         self._next_cross_eligible_at: float | None = None

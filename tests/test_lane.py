@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.models.deque import Deque
+from src.data_structures.deque import Deque
 import pytest
 from src.models.lane import Lane
 from src.models.vehicle import Vehicle

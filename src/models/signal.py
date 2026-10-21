@@ -1,6 +1,6 @@
 """Lịch tín hiệu danh định; Controller quyết định khi nào chuyển đoạn."""
 
-from src.models.deque import Deque
+from src.data_structures.deque import Deque
 from dataclasses import dataclass, field
 
 from src.models.config import Config, direction, integer, number

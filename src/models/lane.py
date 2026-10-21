@@ -1,5 +1,5 @@
 """Hàng đợi FIFO của các xe chưa được lấy ra sau crossing."""
-from src.models.deque import Deque
+from src.data_structures.deque import Deque
 from src.models.config import direction as require_direction, number
 from src.models.vehicle import Vehicle
 
